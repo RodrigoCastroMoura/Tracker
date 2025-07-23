@@ -55,6 +55,8 @@ class DatabaseManager:
     def insert_vehicle_data(self, vehicle_data: VehicleData) -> bool:
         """Insert vehicle tracking data"""
         try:
+            if self.db is None:
+                return False
             collection = self.db['vehicle_data']
             result = collection.insert_one(vehicle_data.to_dict())
             logger.log_database_operation('INSERT', 'vehicle_data', vehicle_data.imei)
@@ -66,6 +68,8 @@ class DatabaseManager:
     def upsert_vehicle(self, vehicle: Vehicle) -> bool:
         """Update or insert vehicle information"""
         try:
+            if self.db is None:
+                return False
             collection = self.db['vehicles']
             filter_query = {'imei': vehicle.imei}
             update_data = vehicle.to_dict()
@@ -86,6 +90,8 @@ class DatabaseManager:
     def get_vehicle_by_imei(self, imei: str) -> Optional[Dict[str, Any]]:
         """Get vehicle information by IMEI"""
         try:
+            if self.db is None:
+                return None
             collection = self.db['vehicles']
             vehicle = collection.find_one({'imei': imei})
             logger.log_database_operation('SELECT', 'vehicles', imei)
@@ -97,6 +103,8 @@ class DatabaseManager:
     def get_latest_vehicle_data(self, imei: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Get latest vehicle tracking data by IMEI"""
         try:
+            if self.db is None:
+                return []
             collection = self.db['vehicle_data']
             data = list(collection.find({'imei': imei})
                        .sort('server_timestamp', -1)
@@ -110,8 +118,10 @@ class DatabaseManager:
     def test_connection(self) -> bool:
         """Test database connection"""
         try:
-            self.client.admin.command('ping')
-            return True
+            if self.client:
+                self.client.admin.command('ping')
+                return True
+            return False
         except Exception as e:
             logger.error(f"Database connection test failed: {e}")
             return False
@@ -121,6 +131,21 @@ class DatabaseManager:
         if self.client:
             self.client.close()
             logger.info("Database connection closed")
+    
+    def close_connection(self):
+        """Alias for close method"""
+        self.close()
+        
+    def get_pending_commands(self, imei: str) -> List[Dict[str, Any]]:
+        """Get pending commands for a vehicle - simplified version"""
+        try:
+            if self.db is None:
+                return []
+            # Para simplicidade, retornamos lista vazia - comandos podem ser implementados futuramente
+            return []
+        except Exception as e:
+            logger.error(f"Error getting pending commands for IMEI {imei}: {e}")
+            return []
 
 # Global database manager instance
 db_manager = DatabaseManager()

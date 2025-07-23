@@ -103,7 +103,7 @@ class GV50TCPServer:
                         continue
                     
                     # Process message and get response
-                    response = message_handler.process_message(parsed_data, client_ip)
+                    response = message_handler.handle_incoming_message(raw_message, client_ip)
                     
                     # Send acknowledgment if available
                     if response:

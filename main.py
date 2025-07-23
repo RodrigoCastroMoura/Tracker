@@ -120,9 +120,13 @@ class GV50TrackerService:
         """Test database connection"""
         try:
             # Test connection by attempting to ping the database
-            db_manager.client.admin.command('ping')
-            logger.info("Database connection test passed")
-            return True
+            if db_manager.client:
+                db_manager.client.admin.command('ping')
+                logger.info("Database connection test passed")
+                return True
+            else:
+                logger.error("Database client not initialized")
+                return False
             
         except Exception as e:
             logger.error(f"Database connection test failed: {e}")
@@ -206,7 +210,8 @@ class GV50TrackerService:
 def signal_handler(signum, frame):
     """Handle system signals for graceful shutdown"""
     logger.info(f"Received signal {signum}, initiating graceful shutdown...")
-    service.stop()
+    if 'service' in globals() and service:
+        service.stop()
     sys.exit(0)
 
 def main():

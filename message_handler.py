@@ -116,7 +116,7 @@ class MessageHandler:
             # Merge with existing data if available
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None:
+                    if key not in vehicle_data and value is not None and key != '_id':
                         vehicle_data[key] = value
             
             # Create vehicle object and save
