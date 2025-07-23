@@ -66,13 +66,8 @@ The application follows a modular architecture with clear separation of concerns
 - Handles connection failures and retries
 
 ### Data Models (`models.py`)
-- **VehicleData**: Individual GPS tracking records with complete location data and raw messages
-- **Vehicle**: Device/vehicle information, current status, and control states
-- **VehicleCommands**: Extended vehicle lookup table for command operations (read-only)
-- **EventLog**: System and device events including ignition, alerts, and control actions  
-- **MessageLog**: Complete communication logs with direction tracking
-- **IPChangeLog**: IP address change tracking with timestamps
-- **BatteryEvent**: Battery level monitoring and alert events
+- **VehicleData**: Individual GPS tracking records with complete location data, raw messages, and all device events
+- **Vehicle**: Device/vehicle information, current status, control states, ignition status, and battery levels
 
 ## Data Flow
 
@@ -89,7 +84,7 @@ The application follows a modular architecture with clear separation of concerns
 ### Database
 - **MongoDB**: Primary data storage using PyMongo driver  
 - Connection: `mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/gv50_tracker`
-- Collections: `vehicle_data`, `vehicles`, `vehicle_commands`, `event_logs`, `message_logs`, `ip_change_logs`, `battery_events`
+- Collections: `vehicle_data`, `vehicles` (only 2 tables as requested)
 - Automatic indexing for optimal query performance
 
 ### Python Packages
@@ -148,14 +143,9 @@ The application follows a modular architecture with clear separation of concerns
 - **IP Change Monitoring**: Automatic detection and logging of device IP changes
 - **Battery Event Processing**: Low/critical battery alerts with configurable thresholds
 
-### Database Architecture
-- **vehicle_data**: Primary tracking data with GPS coordinates, speed, altitude
-- **vehicles**: Device information with current status and control states
-- **vehicle_commands**: Extended lookup table for command operations (read-only)
-- **event_logs**: All system events including ignition changes, alerts, commands
-- **message_logs**: Complete communication audit trail
-- **ip_change_logs**: Device IP change tracking with timestamps
-- **battery_events**: Battery level monitoring with alert generation
+### Database Architecture (Simplified - 2 Tables Only)
+- **vehicle_data**: Primary tracking data with GPS coordinates, speed, altitude, raw messages, and all GPS events
+- **vehicles**: Device information with current status, control states, ignition status, and battery levels
 
 ### Configuration Management
 - **Environment-Based Setup**: All settings via .env file including logging controls

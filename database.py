@@ -4,10 +4,10 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from config import Config
 from logger import logger
-from models import VehicleData, Vehicle, EventLog, MessageLog, IPChangeLog, VehicleCommands, BatteryEvent
+from models import VehicleData, Vehicle
 
 class DatabaseManager:
-    """Database manager for MongoDB operations"""
+    """Database manager for MongoDB operations - apenas duas tabelas"""
     
     def __init__(self):
         self.client: Optional[MongoClient] = None
@@ -28,42 +28,20 @@ class DatabaseManager:
             raise
     
     def setup_collections(self):
-        """Setup MongoDB collections and indexes"""
+        """Setup MongoDB collections and indexes - apenas duas tabelas"""
         try:
-            # Create indexes for better performance
+            # Create indexes for better performance - apenas para as duas tabelas solicitadas
             collections_indexes = {
                 'vehicle_data': [
                     ('imei', ASCENDING),
                     ('server_timestamp', ASCENDING),
-                    ('device_timestamp', ASCENDING)
+                    ('device_timestamp', ASCENDING),
+                    ('message_type', ASCENDING)
                 ],
                 'vehicles': [
                     ('imei', ASCENDING),
-                    ('last_update', ASCENDING)
-                ],
-                'event_logs': [
-                    ('imei', ASCENDING),
-                    ('event_type', ASCENDING),
-                    ('timestamp', ASCENDING)
-                ],
-                'message_logs': [
-                    ('imei', ASCENDING),
-                    ('timestamp', ASCENDING),
-                    ('message_direction', ASCENDING)
-                ],
-                'ip_change_logs': [
-                    ('imei', ASCENDING),
-                    ('timestamp', ASCENDING)
-                ],
-                'vehicle_commands': [
-                    ('imei', ASCENDING),
-                    ('plate_number', ASCENDING),
-                    ('owner_cpf', ASCENDING)
-                ],
-                'battery_events': [
-                    ('imei', ASCENDING),
-                    ('timestamp', ASCENDING),
-                    ('battery_level', ASCENDING)
+                    ('last_update', ASCENDING),
+                    ('plate_number', ASCENDING)
                 ]
             }
             
@@ -72,7 +50,7 @@ class DatabaseManager:
                 for index in indexes:
                     collection.create_index([index])
             
-            logger.info("Database collections and indexes setup completed")
+            logger.info("Database collections and indexes setup completed - 2 tables: vehicle_data, vehicles")
         except Exception as e:
             logger.error(f"Error setting up collections: {e}")
     
@@ -118,111 +96,29 @@ class DatabaseManager:
             logger.error(f"Error getting vehicle for IMEI {imei}: {e}")
             return None
     
-    def insert_event_log(self, event_log: EventLog) -> bool:
-        """Insert event log"""
+    def get_latest_vehicle_data(self, imei: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get latest vehicle tracking data by IMEI"""
         try:
-            collection = self.db['event_logs']
-            result = collection.insert_one(event_log.to_dict())
-            logger.log_database_operation('INSERT', 'event_logs', event_log.imei)
-            return result.inserted_id is not None
+            collection = self.db['vehicle_data']
+            data = list(collection.find({'imei': imei})
+                       .sort('server_timestamp', -1)
+                       .limit(limit))
+            logger.log_database_operation('SELECT', 'vehicle_data', imei)
+            return data
         except Exception as e:
-            logger.error(f"Error inserting event log for IMEI {event_log.imei}: {e}")
-            return False
-    
-    def insert_message_log(self, message_log: MessageLog) -> bool:
-        """Insert message log"""
-        try:
-            if not Config.SAVE_RAW_MESSAGES:
-                return True
-                
-            collection = self.db['message_logs']
-            result = collection.insert_one(message_log.to_dict())
-            logger.log_database_operation('INSERT', 'message_logs', message_log.imei)
-            return result.inserted_id is not None
-        except Exception as e:
-            logger.error(f"Error inserting message log for IMEI {message_log.imei}: {e}")
-            return False
-    
-    def insert_ip_change_log(self, ip_log: IPChangeLog) -> bool:
-        """Insert IP change log"""
-        try:
-            collection = self.db['ip_change_logs']
-            result = collection.insert_one(ip_log.to_dict())
-            logger.log_database_operation('INSERT', 'ip_change_logs', ip_log.imei)
-            return result.inserted_id is not None
-        except Exception as e:
-            logger.error(f"Error inserting IP change log for IMEI {ip_log.imei}: {e}")
-            return False
-
-    def get_vehicle_commands_by_imei(self, imei: str) -> Optional[Dict[str, Any]]:
-        """Get vehicle commands information by IMEI (para pesquisa apenas)"""
-        try:
-            collection = self.db['vehicle_commands']
-            vehicle_cmd = collection.find_one({'imei': imei})
-            logger.log_database_operation('SELECT', 'vehicle_commands', imei)
-            return vehicle_cmd
-        except Exception as e:
-            logger.error(f"Error getting vehicle commands for IMEI {imei}: {e}")
-            return None
-
-    def get_vehicle_commands_by_plate(self, plate_number: str) -> Optional[Dict[str, Any]]:
-        """Get vehicle commands information by plate number"""
-        try:
-            collection = self.db['vehicle_commands']
-            vehicle_cmd = collection.find_one({'plate_number': plate_number})
-            logger.log_database_operation('SELECT', 'vehicle_commands', plate_number)
-            return vehicle_cmd
-        except Exception as e:
-            logger.error(f"Error getting vehicle commands for plate {plate_number}: {e}")
-            return None
-
-    def get_vehicle_commands_by_cpf(self, owner_cpf: str) -> List[Dict[str, Any]]:
-        """Get all vehicles for an owner by CPF"""
-        try:
-            collection = self.db['vehicle_commands']
-            vehicles = list(collection.find({'owner_cpf': owner_cpf}))
-            logger.log_database_operation('SELECT', 'vehicle_commands', owner_cpf)
-            return vehicles
-        except Exception as e:
-            logger.error(f"Error getting vehicles for CPF {owner_cpf}: {e}")
-            return []
-
-    def insert_battery_event(self, battery_event: BatteryEvent) -> bool:
-        """Insert battery event"""
-        try:
-            collection = self.db['battery_events']
-            result = collection.insert_one(battery_event.to_dict())
-            logger.log_database_operation('INSERT', 'battery_events', battery_event.imei)
-            return result.inserted_id is not None
-        except Exception as e:
-            logger.error(f"Error inserting battery event for IMEI {battery_event.imei}: {e}")
-            return False
-    
-    def get_pending_commands(self, imei: str) -> List[Dict[str, Any]]:
-        """Get pending commands for a vehicle"""
-        try:
-            collection = self.db['vehicles']
-            vehicle = collection.find_one({'imei': imei})
-            
-            if not vehicle:
-                return []
-            
-            commands = []
-            
-            # Check for block/unblock commands
-            if vehicle.get('block_command_pending', False):
-                command_type = 'block' if not vehicle.get('is_blocked', False) else 'unblock'
-                commands.append({
-                    'type': command_type,
-                    'command': f'AT+GTOUT={Config.DEFAULT_PASSWORD},1,0,0,,,1234$' if command_type == 'block' else f'AT+GTOUT={Config.DEFAULT_PASSWORD},1,1,0,,,1234$'
-                })
-            
-            return commands
-        except Exception as e:
-            logger.error(f"Error getting pending commands for IMEI {imei}: {e}")
+            logger.error(f"Error getting vehicle data for IMEI {imei}: {e}")
             return []
     
-    def close_connection(self):
+    def test_connection(self) -> bool:
+        """Test database connection"""
+        try:
+            self.client.admin.command('ping')
+            return True
+        except Exception as e:
+            logger.error(f"Database connection test failed: {e}")
+            return False
+    
+    def close(self):
         """Close database connection"""
         if self.client:
             self.client.close()
