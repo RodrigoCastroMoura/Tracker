@@ -38,9 +38,10 @@ class MessageHandler:
                 latitude=parsed_data.get('latitude'),
                 altitude=parsed_data.get('altitude'),
                 speed=parsed_data.get('speed'),
-                course=parsed_data.get('course'),
                 ignition=parsed_data.get('ignition'),
                 battery_level=parsed_data.get('battery_level'),
+                data=datetime.utcnow(),
+                dataDevice=parsed_data.get('device_timestamp', ''),
                 mensagem_raw=raw_message
             )
             

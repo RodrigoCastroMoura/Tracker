@@ -10,9 +10,10 @@ class VehicleData:
     latitude: Optional[str] = None
     altitude: Optional[str] = None
     speed: Optional[str] = None
-    course: Optional[str] = None
     ignition: Optional[bool] = None
     battery_level: Optional[str] = None
+    data: Optional[datetime] = None
+    dataDevice: str = ""
     mensagem_raw: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
