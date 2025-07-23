@@ -34,9 +34,7 @@ class DatabaseManager:
             collections_indexes = {
                 'vehicle_data': [
                     ('imei', ASCENDING),
-                    ('server_timestamp', ASCENDING),
-                    ('device_timestamp', ASCENDING),
-                    ('message_type', ASCENDING)
+                    ('ignition', ASCENDING)
                 ],
                 'vehicles': [
                     ('imei', ASCENDING),

@@ -4,7 +4,7 @@ from dataclasses import dataclass, asdict
 
 @dataclass
 class VehicleData:
-    """Vehicle tracking data model - tabela principal para dados GPS"""
+    """Vehicle tracking data model - apenas campos solicitados"""
     imei: str
     longitude: Optional[str] = None
     latitude: Optional[str] = None
@@ -13,21 +13,11 @@ class VehicleData:
     course: Optional[str] = None
     ignition: Optional[bool] = None
     battery_level: Optional[str] = None
-    gsm_signal: Optional[str] = None
-    gps_accuracy: Optional[str] = None
-    device_timestamp: Optional[str] = None
-    server_timestamp: Optional[datetime] = None
-    message_type: Optional[str] = None  # +RESP, +BUFF, +ACK
-    report_type: Optional[str] = None   # GTFRI, GTIGN, etc
-    mensagem_raw: Optional[str] = None  # Mensagem original completa
-    client_ip: Optional[str] = None
+    mensagem_raw: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for MongoDB insertion"""
-        data = asdict(self)
-        if self.server_timestamp is None:
-            data['server_timestamp'] = datetime.utcnow()
-        return data
+        return asdict(self)
 
 @dataclass
 class Vehicle:

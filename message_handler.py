@@ -31,7 +31,7 @@ class MessageHandler:
                 logger.info(f"IP change detected for IMEI {imei}: {self.device_ips[imei]} -> {client_ip}")
             self.device_ips[imei] = client_ip
             
-            # Create vehicle data record
+            # Create vehicle data record - apenas campos solicitados
             vehicle_data = VehicleData(
                 imei=imei,
                 longitude=parsed_data.get('longitude'),
@@ -41,14 +41,7 @@ class MessageHandler:
                 course=parsed_data.get('course'),
                 ignition=parsed_data.get('ignition'),
                 battery_level=parsed_data.get('battery_level'),
-                gsm_signal=parsed_data.get('gsm_signal'),
-                gps_accuracy=parsed_data.get('gps_accuracy'),
-                device_timestamp=parsed_data.get('device_timestamp'),
-                message_type=parsed_data.get('message_type'),
-                report_type=parsed_data.get('report_type'),
-                mensagem_raw=raw_message,
-                client_ip=client_ip,
-                server_timestamp=datetime.utcnow()
+                mensagem_raw=raw_message
             )
             
             # Save vehicle data
