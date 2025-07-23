@@ -66,7 +66,6 @@ class GV50TrackerService:
             logger.info(f"Server listening on {Config.SERVER_IP}:{Config.SERVER_PORT}")
             logger.info(f"Database: {Config.DATABASE_NAME}")
             logger.info(f"Logging enabled: {Config.LOGGING_ENABLED}")
-            logger.info(f"Raw message storage: {Config.SAVE_RAW_MESSAGES}")
             
             return True
             

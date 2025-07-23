@@ -18,16 +18,8 @@ class Config:
     BLOCKED_IPS: List[str] = [ip.strip() for ip in os.getenv('BLOCKED_IPS', '').split(',') if ip.strip()]
     IP_WHITELIST_ENABLED: bool = os.getenv('IP_WHITELIST_ENABLED', 'false').lower() == 'true'
     
-    # Logging Configuration
+    # Logging Configuration - apenas ativar/desativar log
     LOGGING_ENABLED: bool = os.getenv('LOGGING_ENABLED', 'true').lower() == 'true'
-    LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO').upper()
-    LOG_TO_FILE: bool = os.getenv('LOG_TO_FILE', 'true').lower() == 'true'
-    LOG_TO_CONSOLE: bool = os.getenv('LOG_TO_CONSOLE', 'true').lower() == 'true'
-    LOG_ALL_MESSAGES: bool = os.getenv('LOG_ALL_MESSAGES', 'true').lower() == 'true'
-    LOG_INCOMING_MESSAGES: bool = os.getenv('LOG_INCOMING_MESSAGES', 'true').lower() == 'true'
-    LOG_OUTGOING_MESSAGES: bool = os.getenv('LOG_OUTGOING_MESSAGES', 'true').lower() == 'true'
-    LOG_DATABASE_OPERATIONS: bool = os.getenv('LOG_DATABASE_OPERATIONS', 'false').lower() == 'true'
-    SAVE_RAW_MESSAGES: bool = os.getenv('SAVE_RAW_MESSAGES', 'true').lower() == 'true'
     
     # Database Configuration
     MONGODB_URI: str = os.getenv('MONGODB_URI', 'mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/')
