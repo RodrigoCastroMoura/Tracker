@@ -8,38 +8,35 @@ load_dotenv()
 class Config:
     """Configuration class for GV50 tracker service"""
     
-    # Service Configuration
-    SERVER_ENABLED: bool = os.getenv('SERVER_ENABLED', 'true').lower() == 'true'
-    SERVER_IP: str = os.getenv('SERVER_IP', '0.0.0.0')
-    SERVER_PORT: int = int(os.getenv('SERVER_PORT', '8080'))
+    # Service Configuration - fixos
+    SERVER_ENABLED: bool = True
+    SERVER_IP: str = '0.0.0.0'
+    SERVER_PORT: int = int(os.getenv('SERVER_PORT', '5000'))
     
-    # IP Management
+    # IP Management - apenas IPs permitidos (configurável)
     ALLOWED_IPS: List[str] = [ip.strip() for ip in os.getenv('ALLOWED_IPS', '').split(',') if ip.strip()]
-    BLOCKED_IPS: List[str] = [ip.strip() for ip in os.getenv('BLOCKED_IPS', '').split(',') if ip.strip()]
-    IP_WHITELIST_ENABLED: bool = os.getenv('IP_WHITELIST_ENABLED', 'false').lower() == 'true'
     
     # Logging Configuration - apenas ativar/desativar log
     LOGGING_ENABLED: bool = os.getenv('LOGGING_ENABLED', 'true').lower() == 'true'
     
-    # Database Configuration
+    # Database Configuration - fixos
     MONGODB_URI: str = os.getenv('MONGODB_URI', 'mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/')
     DATABASE_NAME: str = os.getenv('DATABASE_NAME', 'gv50_tracker')
     
-    # Protocol Configuration
-    DEFAULT_PASSWORD: str = os.getenv('DEFAULT_PASSWORD', 'gv50')
-    HEARTBEAT_INTERVAL: int = int(os.getenv('HEARTBEAT_INTERVAL', '30'))
-    CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '300'))
+    # Protocol Configuration - fixos
+    DEFAULT_PASSWORD: str = 'gv50'
+    HEARTBEAT_INTERVAL: int = 30
+    CONNECTION_TIMEOUT: int = 300
     
     @classmethod
     def is_ip_allowed(cls, ip: str) -> bool:
-        """Check if IP address is allowed to connect"""
-        if ip in cls.BLOCKED_IPS:
-            return False
+        """Check if IP address is allowed to connect - apenas lista de IPs permitidos"""
+        # Se não há IPs configurados, permite todos
+        if not cls.ALLOWED_IPS:
+            return True
         
-        if cls.IP_WHITELIST_ENABLED:
-            return ip in cls.ALLOWED_IPS
-        
-        return True
+        # Se há IPs configurados, apenas esses são permitidos
+        return ip in cls.ALLOWED_IPS
     
     @classmethod
     def reload_config(cls):
