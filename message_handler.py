@@ -40,8 +40,8 @@ class MessageHandler:
                 speed=parsed_data.get('speed'),
                 ignition=parsed_data.get('ignition'),
                 battery_level=parsed_data.get('battery_level'),
-                data=datetime.utcnow(),
-                dataDevice=parsed_data.get('device_timestamp', ''),
+                timestamp=datetime.utcnow(),
+                deviceTimestamp=parsed_data.get('device_timestamp', ''),
                 mensagem_raw=raw_message
             )
             

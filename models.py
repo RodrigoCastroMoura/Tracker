@@ -12,8 +12,8 @@ class VehicleData:
     speed: Optional[str] = None
     ignition: Optional[bool] = None
     battery_level: Optional[str] = None
-    data: Optional[datetime] = None
-    dataDevice: str = ""
+    timestamp: Optional[datetime] = None
+    deviceTimestamp: str = ""
     mensagem_raw: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
