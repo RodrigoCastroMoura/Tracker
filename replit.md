@@ -41,6 +41,10 @@ Preferred communication style: Simple, everyday language.
 ✓ Completely rewrote TCP server based on C# code example provided by user
 ✓ Implemented exact C# parsing logic with proper field mapping for all protocols
 ✓ Added C#-style connection handling with immediate disconnect after processing
+✓ Modified system to use TCP long-connection as recommended by manufacturer
+✓ Restructured Vehicle table with English field names without underscores
+✓ Implemented command system for blocking/unblocking and IP change
+✓ Created and tested vehicles in database with new structure
 
 ## System Architecture
 
