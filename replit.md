@@ -26,6 +26,10 @@ Preferred communication style: Simple, everyday language.
 ✓ Auto-restart system implemented with cron job configuration
 ✓ Backup system with automated daily/weekly backups and cleanup
 ✓ Production-ready systemd service configuration
+✓ CentOS-specific installation created with simplified /tracker/ structure
+✓ Removed complex subdirectories - now uses single /tracker/ folder
+✓ Created simplified scripts for auto-restart, backup, and monitoring
+✓ All scripts adapted for CentOS firewalld, SELinux, and systemd
 
 ## System Architecture
 
