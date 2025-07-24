@@ -21,12 +21,16 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd gv50 && pip install pymongo python-dotenv && python main.py"
-waitForPort = 5000
+args = "cd gv50 && python start_service.py"
+waitForPort = 8000
 
 [[ports]]
 localPort = 5000
 externalPort = 5000
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
 
 [[ports]]
 localPort = 8080

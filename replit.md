@@ -45,6 +45,9 @@ Preferred communication style: Simple, everyday language.
 ✓ Restructured Vehicle table with English field names without underscores
 ✓ Implemented command system for blocking/unblocking and IP change
 ✓ Created and tested vehicles in database with new structure
+✓ Fixed server port from 5000 to 8000 as required by GV50 devices
+✓ Corrected database connection to use 'track' database where data exists
+✓ System now properly listening on port 8000 for GPS device connections
 
 ## System Architecture
 
