@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Optional, List, Tuple
 from datetime import datetime
-from logger import logger
+from common.logger import logger
 
 class QueclinkProtocolParser:
     """Parser for Queclink @Track protocol messages"""

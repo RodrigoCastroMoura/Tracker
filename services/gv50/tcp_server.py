@@ -2,11 +2,11 @@ import socket
 import threading
 import time
 from typing import Dict, List
-from config import Config
-from logger import logger
-from protocol_parser import protocol_parser
-from message_handler import message_handler
-from database import db_manager
+from common.config import Config
+from common.logger import logger
+from services.gv50.protocol_parser import protocol_parser
+from services.gv50.message_handler import message_handler
+from common.database import db_manager
 
 class GV50TCPServer:
     """TCP server for handling GV50 device connections"""

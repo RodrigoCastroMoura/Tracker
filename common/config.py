@@ -21,7 +21,7 @@ class Config:
     
     # Database Configuration - fixos
     MONGODB_URI: str = os.getenv('MONGODB_URI', 'mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/')
-    DATABASE_NAME: str = os.getenv('DATABASE_NAME', 'gv50_tracker')
+    DATABASE_NAME: str = os.getenv('DATABASE_NAME', 'tracker')
     
     # Protocol Configuration - fixos
     DEFAULT_PASSWORD: str = 'gv50'

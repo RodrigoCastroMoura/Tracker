@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Dict, Optional, Any
-from database import db_manager
-from protocol_parser import protocol_parser
-from logger import logger
-from models import VehicleData, Vehicle
+from common.database import db_manager
+from services.gv50.protocol_parser import protocol_parser
+from common.logger import logger
+from common.models import VehicleData, Vehicle
 
 class MessageHandler:
     """Handle parsed messages and update database - apenas duas tabelas"""

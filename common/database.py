@@ -2,9 +2,9 @@ from pymongo import MongoClient, ASCENDING
 from pymongo.errors import ConnectionFailure, OperationFailure
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from config import Config
-from logger import logger
-from models import VehicleData, Vehicle
+from common.config import Config
+from common.logger import logger
+from common.models import VehicleData, Vehicle
 
 class DatabaseManager:
     """Database manager for MongoDB operations - apenas duas tabelas"""

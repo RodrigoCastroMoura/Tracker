@@ -1,8 +1,8 @@
-# GV50 Tracker Service
+# GPS Tracker Service
 
 ## Overview
 
-This is a comprehensive Python-based GPS tracking service designed specifically for GV50 GPS tracking devices. The service implements a robust TCP server that communicates with GPS devices using the Queclink @Track protocol, processes incoming location and event data, and stores it in a MongoDB database. The system provides complete raw message preservation, extensive logging capabilities, and support for vehicle control commands including blocking/unblocking functionality.
+This is a comprehensive Python-based GPS tracking service designed for multiple GPS tracking device types. The service implements a robust TCP server that communicates with GPS devices using various protocols, processes incoming location and event data, and stores it in a MongoDB database. The system is organized with separate service modules for each device type, starting with GV50 support using the Queclink @Track protocol.
 
 ## User Preferences
 
@@ -29,16 +29,21 @@ Preferred communication style: Simple, everyday language.
 ✓ Updated VehicleData model: removed 'course' field, added 'timestamp', 'deviceTimestamp' and 'systemDate' fields
 ✓ All field names now follow English standard: timestamp, deviceTimestamp, systemDate (all datetime fields)
 ✓ Tested new structure with successful data storage and field validation
+✓ Reorganized codebase: services/gv50/ for device-specific code, common/ for shared utilities
+✓ Changed database name from 'gv50_tracker' to 'tracker' for multi-device support
+✓ Modular architecture ready for additional device types
 
 ## System Architecture
 
 The application follows a modular architecture with clear separation of concerns:
 
 ### Backend Architecture
+- **Modular Services**: Device-specific services organized by type (services/gv50/, future: services/other_devices/)
+- **Common Utilities**: Shared components for database, logging, models, and configuration (common/)
 - **TCP Server**: Custom socket-based server for handling persistent connections with GPS devices
-- **Protocol Parser**: Dedicated parser for Queclink @Track protocol messages
+- **Protocol Parser**: Device-specific parsers (currently Queclink @Track for GV50)
 - **Message Handler**: Business logic layer for processing parsed messages and database operations
-- **Database Layer**: MongoDB integration with connection management and data models
+- **Database Layer**: MongoDB integration with unified 'tracker' database for all device types
 - **Configuration Management**: Environment-based configuration with sensible defaults
 - **Logging System**: Comprehensive logging with configurable levels and outputs
 
@@ -50,34 +55,43 @@ The application follows a modular architecture with clear separation of concerns
 
 ## Key Components
 
-### TCP Server (`tcp_server.py`)
-- Manages incoming TCP connections from GPS devices
+### Service Layer (services/gv50/)
+#### TCP Server (`tcp_server.py`)
+- Manages incoming TCP connections from GV50 GPS devices
 - Implements IP whitelisting/blacklisting for security
 - Handles connection lifecycle and cleanup
 - Supports up to 100 concurrent device connections
 
-### Protocol Parser (`protocol_parser.py`)
-- Parses Queclink @Track protocol messages
+#### Protocol Parser (`protocol_parser.py`)
+- Parses Queclink @Track protocol messages for GV50 devices
 - Supports multiple message types (GTFRI, GTIGN, GTIGF, etc.)
 - Generates acknowledgment responses for devices
 - Extracts GPS coordinates, speed, ignition status, and other telemetry data
 
-### Message Handler (`message_handler.py`)
+#### Message Handler (`message_handler.py`)
 - Processes parsed messages and updates database
 - Handles different message types (reports, acknowledgments, events)
 - Tracks IP address changes for devices
 - Manages vehicle state updates
 
-### Database Manager (`database.py`)
-- Manages MongoDB connections and operations
+### Common Layer (common/)
+#### Database Manager (`database.py`)
+- Manages MongoDB connections and operations for 'tracker' database
 - Implements data models for vehicles, tracking data, and logs
 - Creates appropriate indexes for performance
 - Handles connection failures and retries
 
-### Data Models (`models.py`)
+#### Data Models (`models.py`)
 - **VehicleData**: Individual GPS tracking records with 10 specific fields:
   - imei, longitude, latitude, altitude, speed, ignition, battery_level, timestamp (server timestamp), deviceTimestamp (device timestamp), systemDate (system timestamp), mensagem_raw
 - **Vehicle**: Device/vehicle information, current status, control states, ignition status, and battery levels
+
+#### Configuration (`config.py`)
+- Environment-based configuration management
+- Unified settings for all device services
+
+#### Logging (`logger.py`)
+- Centralized logging system for all services
 
 ## Data Flow
 
@@ -93,7 +107,8 @@ The application follows a modular architecture with clear separation of concerns
 
 ### Database
 - **MongoDB**: Primary data storage using PyMongo driver  
-- Connection: `mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/gv50_tracker`
+- Database: `tracker` (unified database for all device types)
+- Connection: `mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/tracker`
 - Collections: `vehicle_data`, `vehicles` (only 2 tables as requested)
 - Automatic indexing for optimal query performance
 
