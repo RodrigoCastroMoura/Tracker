@@ -33,6 +33,9 @@ Preferred communication style: Simple, everyday language.
 ✓ Cleaned up project structure - removed scripts/, systemd/, and manual files per user request
 ✓ Simplified configuration: moved .env to root directory instead of gv50/.env
 ✓ Updated config.py to load environment variables from root .env file
+✓ Fixed IP filtering logic to properly recognize 0.0.0.0/0 as "allow all IPs"
+✓ Added file logging back to logger.py - logs now save to ../logs/ directory
+✓ Created deps.txt file in gv50/ folder for easy dependency installation
 
 ## System Architecture
 

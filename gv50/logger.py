@@ -34,6 +34,17 @@ class GV50Logger:
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
         
+        # File handler - adicionar logging para arquivo
+        log_dir = '../logs'
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        log_filename = f"{log_dir}/gv50_tracker_{datetime.now().strftime('%Y%m%d')}.log"
+        file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        
         # Prevent propagation to root logger
         self.logger.propagate = False
     
