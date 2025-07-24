@@ -34,12 +34,12 @@ class DatabaseManager:
             collections_indexes = {
                 'vehicle_data': [
                     ('imei', ASCENDING),
-                    ('ignition', ASCENDING)
+                    ('timestamp', ASCENDING)  # Removido ignition, agora só na vehicles
                 ],
                 'vehicles': [
-                    ('imei', ASCENDING),
-                    ('last_update', ASCENDING),
-                    ('plate_number', ASCENDING)
+                    ('IMEI', ASCENDING),  # Novo campo IMEI maiúsculo
+                    ('tsusermanu', ASCENDING),  # Novo campo timestamp
+                    ('dsplaca', ASCENDING)  # Novo campo placa
                 ]
             }
             
@@ -59,7 +59,7 @@ class DatabaseManager:
                 return False
             collection = self.db['vehicle_data']
             result = collection.insert_one(vehicle_data.to_dict())
-            logger.log_database_operation('INSERT', 'vehicle_data', vehicle_data.imei)
+            logger.debug(f"Inserted vehicle_data for IMEI: {vehicle_data.imei}")
             return result.inserted_id is not None
         except Exception as e:
             logger.error(f"Error inserting vehicle data for IMEI {vehicle_data.imei}: {e}")
@@ -71,7 +71,7 @@ class DatabaseManager:
             if self.db is None:
                 return False
             collection = self.db['vehicles']
-            filter_query = {'imei': vehicle.imei}
+            filter_query = {'IMEI': vehicle.IMEI}  # Usar novo campo IMEI
             update_data = vehicle.to_dict()
             
             result = collection.update_one(
@@ -81,10 +81,10 @@ class DatabaseManager:
             )
             
             operation = 'UPDATE' if result.matched_count > 0 else 'INSERT'
-            logger.log_database_operation(operation, 'vehicles', vehicle.imei)
+            logger.debug(f"Upserted vehicle for IMEI: {vehicle.IMEI}")
             return True
         except Exception as e:
-            logger.error(f"Error upserting vehicle for IMEI {vehicle.imei}: {e}")
+            logger.error(f"Error upserting vehicle for IMEI {vehicle.IMEI}: {e}")
             return False
     
     def get_vehicle_by_imei(self, imei: str) -> Optional[Dict[str, Any]]:
@@ -93,8 +93,8 @@ class DatabaseManager:
             if self.db is None:
                 return None
             collection = self.db['vehicles']
-            vehicle = collection.find_one({'imei': imei})
-            logger.log_database_operation('SELECT', 'vehicles', imei)
+            vehicle = collection.find_one({'IMEI': imei})
+            logger.debug(f"Retrieved vehicle for IMEI: {imei}")
             return vehicle
         except Exception as e:
             logger.error(f"Error getting vehicle for IMEI {imei}: {e}")

@@ -152,15 +152,17 @@ class MessageHandler:
         """Update vehicle ignition status - new structure"""
         try:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {'IMEI': imei, 'ignicao': ignition_status, 'tsusermanu': datetime.utcnow()}
             if existing_vehicle:
-                vehicle_data = {
-                    'IMEI': imei,
-                    'ignicao': ignition_status,
-                    'tsusermanu': datetime.utcnow()
-                }
-                vehicle = Vehicle(**vehicle_data)
-                db_manager.upsert_vehicle(vehicle)
-                logger.info(f"Updated ignition status for {imei}: {ignition_status}")
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Updated ignition status for {imei}: {ignition_status}")
         except Exception as e:
             logger.error(f"Error updating vehicle ignition: {e}")
     
@@ -168,16 +170,17 @@ class MessageHandler:
         """Update vehicle blocking status - new structure with command logic"""
         try:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {'IMEI': imei, 'bloqueado': blocked, 'comandobloqueo': None, 'tsusermanu': datetime.utcnow()}
             if existing_vehicle:
-                vehicle_data = {
-                    'IMEI': imei,
-                    'bloqueado': blocked,
-                    'comandobloqueo': None,  # Clear command after execution
-                    'tsusermanu': datetime.utcnow()
-                }
-                vehicle = Vehicle(**vehicle_data)
-                db_manager.upsert_vehicle(vehicle)
-                logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
         except Exception as e:
             logger.error(f"Error updating vehicle blocking: {e}")
     
@@ -185,15 +188,17 @@ class MessageHandler:
         """Set pending blocking command for vehicle"""
         try:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {'IMEI': imei, 'comandobloqueo': should_block, 'tsusermanu': datetime.utcnow()}
             if existing_vehicle:
-                vehicle_data = {
-                    'IMEI': imei,
-                    'comandobloqueo': should_block,  # True to block, False to unblock
-                    'tsusermanu': datetime.utcnow()
-                }
-                vehicle = Vehicle(**vehicle_data)
-                db_manager.upsert_vehicle(vehicle)
-                logger.info(f"Set blocking command for {imei}: {'block' if should_block else 'unblock'}")
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Set blocking command for {imei}: {'block' if should_block else 'unblock'}")
         except Exception as e:
             logger.error(f"Error setting blocking command: {e}")
     
@@ -201,15 +206,17 @@ class MessageHandler:
         """Set pending IP change command for vehicle"""
         try:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {'IMEI': imei, 'comandotrocarip': True, 'tsusermanu': datetime.utcnow()}
             if existing_vehicle:
-                vehicle_data = {
-                    'IMEI': imei,
-                    'comandotrocarip': True,
-                    'tsusermanu': datetime.utcnow()
-                }
-                vehicle = Vehicle(**vehicle_data)
-                db_manager.upsert_vehicle(vehicle)
-                logger.info(f"Set IP change command for {imei}")
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Set IP change command for {imei}")
         except Exception as e:
             logger.error(f"Error setting IP change command: {e}")
 
