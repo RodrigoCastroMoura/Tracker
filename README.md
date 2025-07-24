@@ -6,6 +6,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 ```
 ├── .env                       # Environment configuration (root)
+├── deps.txt                   # Python dependencies
 ├── gv50/                      # Complete GV50 service
 │   ├── main.py               # Main service entry point
 │   ├── config.py             # Configuration management
@@ -63,7 +64,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 2. **Install Python dependencies:**
    ```bash
-   pip install pymongo python-dotenv
+   pip install -r deps.txt
    ```
 
 3. **Configure environment variables:**
@@ -73,13 +74,17 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 4. **Run the service:**
    ```bash
-   python main.py
+   cd gv50 && python main.py
    ```
 
 ### Manual Installation
 
 1. **Download and extract the source code**
 2. **Install dependencies:**
+   ```bash
+   pip install -r deps.txt
+   ```
+   Or manually:
    ```bash
    pip install pymongo python-dotenv
    ```
