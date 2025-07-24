@@ -9,8 +9,8 @@ class Config:
     """Configuration class for GV50 tracker service"""
     
     # Service Configuration - do .env
-    SERVER_ENABLED: bool = True
-    SERVER_IP: str = '0.0.0.0'
+    SERVER_ENABLED: bool = os.getenv('SERVER_ENABLED', 'true').lower() == 'true'
+    SERVER_IP: str = os.getenv('SERVER_IP', '0.0.0.0')
     SERVER_PORT: int = int(os.getenv('SERVER_PORT', '5000'))
     
     # IP Management - do .env
