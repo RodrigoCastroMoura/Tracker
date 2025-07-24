@@ -4,14 +4,11 @@ from dataclasses import dataclass, asdict
 
 @dataclass
 class VehicleData:
-    """Vehicle tracking data model - apenas campos solicitados"""
+    """Vehicle tracking data model - apenas dados de localização"""
     imei: str
     longitude: Optional[str] = None
     latitude: Optional[str] = None
     altitude: Optional[str] = None
-    speed: Optional[str] = None
-    ignition: Optional[bool] = None
-    battery_level: Optional[str] = None
     timestamp: Optional[datetime] = None
     deviceTimestamp: str = ""
     systemDate: Optional[datetime] = None
@@ -23,7 +20,7 @@ class VehicleData:
 
 @dataclass
 class Vehicle:
-    """Vehicle information model - tabela para informações dos veículos"""
+    """Vehicle information model - inclui speed, ignition e battery_level"""
     imei: str
     plate_number: Optional[str] = None
     model: Optional[str] = None
@@ -32,6 +29,7 @@ class Vehicle:
     chip_number: Optional[str] = None
     is_blocked: Optional[bool] = False
     ignition_status: Optional[bool] = None
+    speed: Optional[str] = None  # Movido da VehicleData para Vehicle
     battery_level: Optional[str] = None
     last_location: Optional[Dict[str, str]] = None
     last_update: Optional[datetime] = None

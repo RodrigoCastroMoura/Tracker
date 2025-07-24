@@ -91,9 +91,9 @@ The application follows a modular architecture with clear separation of concerns
 - Handles connection failures and retries
 
 #### Data Models (`models.py`)
-- **VehicleData**: Individual GPS tracking records with 10 specific fields:
-  - imei, longitude, latitude, altitude, speed, ignition, battery_level, timestamp (server timestamp), deviceTimestamp (device timestamp), systemDate (system timestamp), mensagem_raw
-- **Vehicle**: Device/vehicle information, current status, control states, ignition status, and battery levels
+- **VehicleData**: Individual GPS tracking records with location data only:
+  - imei, longitude, latitude, altitude, timestamp (server timestamp), deviceTimestamp (device timestamp), systemDate (system timestamp), mensagem_raw
+- **Vehicle**: Device/vehicle information, current status, control states, ignition status, speed, and battery levels
 
 #### Configuration (`config.py`)
 - Environment-based configuration management

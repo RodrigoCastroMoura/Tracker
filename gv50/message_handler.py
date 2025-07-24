@@ -31,16 +31,13 @@ class MessageHandler:
                 logger.info(f"IP change detected for IMEI {imei}: {self.device_ips[imei]} -> {client_ip}")
             self.device_ips[imei] = client_ip
             
-            # Create vehicle data record - apenas campos solicitados
+            # Create vehicle data record - apenas dados de localização
             current_time = datetime.utcnow()
             vehicle_data = VehicleData(
                 imei=imei,
                 longitude=parsed_data.get('longitude'),
                 latitude=parsed_data.get('latitude'),
                 altitude=parsed_data.get('altitude'),
-                speed=parsed_data.get('speed'),
-                ignition=parsed_data.get('ignition'),
-                battery_level=parsed_data.get('battery_level'),
                 timestamp=current_time,
                 deviceTimestamp=parsed_data.get('device_timestamp', ''),
                 systemDate=current_time,
@@ -82,7 +79,7 @@ class MessageHandler:
                 'last_update': datetime.utcnow()
             }
             
-            # Update ignition status if available
+            # Update ignition status if available - salva apenas na tabela vehicles
             if 'ignition' in parsed_data:
                 vehicle_data['ignition_status'] = parsed_data['ignition']
                 if parsed_data['ignition']:
@@ -90,7 +87,11 @@ class MessageHandler:
                 else:
                     logger.info(f"Ignition OFF detected for IMEI {imei}")
             
-            # Update battery level if available
+            # Update speed if available - salva apenas na tabela vehicles  
+            if parsed_data.get('speed'):
+                vehicle_data['speed'] = parsed_data['speed']
+            
+            # Update battery level if available - salva apenas na tabela vehicles
             if parsed_data.get('battery_level'):
                 vehicle_data['battery_level'] = parsed_data['battery_level']
                 # Simple battery level logging
@@ -140,9 +141,6 @@ class MessageHandler:
                 longitude=vehicle_data.get('longitude', '0'),
                 latitude=vehicle_data.get('latitude', '0'),
                 altitude=vehicle_data.get('altitude', '0'),
-                speed=vehicle_data.get('speed', '0'),
-                ignition=vehicle_data.get('ignition'),
-                battery_level=None,
                 timestamp=current_time,
                 deviceTimestamp=vehicle_data.get('device_timestamp', ''),
                 systemDate=current_time,
