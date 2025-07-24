@@ -254,32 +254,16 @@ class GV50TCPServerCSharpStyle:
     def process_ack_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
         """Process +ACK messages like C#"""
         try:
-            if len(command_parts) > 0:
-                command_type = command_parts[0]
-                
-                if command_type == "GTOUT":
-                    # Vehicle blocking/unblocking acknowledgment
-                    if len(command_parts) > 4:
-                        imei = command_parts[2]
-                        status = command_parts[4]
-                        
-                        # Update vehicle blocking status like C#
-                        blocked = (status == "0000")
-                        message_handler.update_vehicle_blocking(imei, blocked)
-                        
-                        logger.info(f"Vehicle {imei} {'blocked' if blocked else 'unblocked'}")
-                
-                elif command_type == "GTHBD":
-                    # Heartbeat acknowledgment - keep connection alive
-                    if len(command_parts) > 2:
-                        imei = command_parts[2]
-                        timestamp = command_parts[4] if len(command_parts) > 4 else ""
-                        
-                        # Update vehicle last seen timestamp
-                        message_handler.update_vehicle_heartbeat(imei, timestamp)
-                        
-                        logger.debug(f"Heartbeat received from IMEI {imei} - connection active")
-                        print(f"Heartbeat from {imei} at {timestamp}")
+            if len(command_parts) > 0 and command_parts[0] == "GTOUT":
+                if len(command_parts) > 4:
+                    imei = command_parts[2]
+                    status = command_parts[4]
+                    
+                    # Update vehicle blocking status like C#
+                    blocked = (status == "0000")
+                    message_handler.update_vehicle_blocking(imei, blocked)
+                    
+                    logger.info(f"Vehicle {imei} {'blocked' if blocked else 'unblocked'}")
                     
         except Exception as e:
             logger.error(f"Error processing ACK message: {e}")

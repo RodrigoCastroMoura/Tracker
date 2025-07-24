@@ -187,47 +187,6 @@ class MessageHandler:
                 logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
         except Exception as e:
             logger.error(f"Error updating vehicle blocking: {e}")
-    
-    def update_vehicle_heartbeat(self, imei: str, timestamp: str):
-        """Update vehicle heartbeat to keep connection active - C# style method"""
-        try:
-            # Parse timestamp if provided
-            device_time = None
-            if timestamp and len(timestamp) >= 14:
-                try:
-                    year = timestamp[0:4]
-                    month = timestamp[4:6]
-                    day = timestamp[6:8]
-                    hour = timestamp[8:10]
-                    minute = timestamp[10:12]
-                    second = timestamp[12:14]
-                    device_time = f"{year}-{month}-{day} {hour}:{minute}:{second}"
-                except:
-                    device_time = None
-            
-            # Update vehicle last seen time
-            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
-            current_time = datetime.utcnow()
-            
-            vehicle_data = {
-                'imei': imei,
-                'last_seen': current_time,
-                'last_heartbeat': device_time if device_time else current_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'connection_status': 'active',
-                'last_update': current_time
-            }
-            
-            # Preserve existing data if vehicle exists
-            if existing_vehicle:
-                for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None and key != '_id':
-                        vehicle_data[key] = value
-            
-            vehicle = Vehicle(**vehicle_data)
-            db_manager.upsert_vehicle(vehicle)
-            
-        except Exception as e:
-            logger.error(f"Error updating vehicle heartbeat: {e}")
 
 # Global message handler instance
 message_handler = MessageHandler()
