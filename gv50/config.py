@@ -26,7 +26,7 @@ class Config:
     # Protocol Configuration - do .env
     DEFAULT_PASSWORD: str = os.getenv('DEFAULT_PASSWORD', 'gv50')
     HEARTBEAT_INTERVAL: int = int(os.getenv('HEARTBEAT_INTERVAL', '30'))
-    CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '300'))
+    CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '3600'))  # 1 hour for long-connection
     MAX_CONNECTIONS: int = int(os.getenv('MAX_CONNECTIONS', '100'))
     
     @classmethod

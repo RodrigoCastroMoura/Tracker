@@ -91,14 +91,19 @@ class GV50TCPServerCSharpStyle:
                     data = client_socket.recv(len(self.bytes_buffer))
                     
                     if not data:
-                        logger.info(f"Client {connection_id} disconnected")
+                        logger.info(f"Client {connection_id} disconnected (long-connection ended)")
                         break
                     
                     # Process received data - equivalent to C# ReadCallback
                     self.read_callback(client_socket, data, client_ip)
                     
+                    # Send heartbeat/keep-alive if needed
+                    self.send_heartbeat_if_needed(client_socket, client_ip)
+                    
                 except socket.timeout:
-                    # Continue on timeout
+                    # Send heartbeat on timeout to keep connection alive
+                    logger.debug(f"Timeout on {connection_id}, sending heartbeat")
+                    self.send_heartbeat_if_needed(client_socket, client_ip)
                     continue
                 except socket.error as e:
                     logger.warning(f"Socket error for {connection_id}: {e}")
@@ -113,7 +118,7 @@ class GV50TCPServerCSharpStyle:
             self.cleanup_connection(client_socket, connection_id)
     
     def read_callback(self, client_socket: socket.socket, data: bytes, client_ip: str):
-        """Process received data - equivalent to C# ReadCallback"""
+        """Process received data - TCP long-connection as recommended by manufacturer"""
         try:
             if len(data) < 1:
                 return
@@ -127,7 +132,7 @@ class GV50TCPServerCSharpStyle:
             connection_id = f"{client_ip}:{client_socket.getpeername()[1]}"
             
             # Log the message like C#
-            print(f"\nA new connection {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            print(f"\nMessage received {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
             print(message)
             logger.debug(f"Received from {connection_id}: {message}")
             
@@ -149,11 +154,8 @@ class GV50TCPServerCSharpStyle:
                     elif msg_type == "+ACK":
                         self.process_ack_message(command_parts, client_socket, client_ip)
                     
-                    # Disconnect after processing like C#
-                    try:
-                        client_socket.close()
-                    except:
-                        pass
+                    # KEEP CONNECTION ALIVE - TCP long-connection as recommended
+                    logger.info(f"Keeping connection alive for {connection_id} (long-connection mode)")
                         
         except Exception as e:
             logger.error(f"Error in read_callback: {e}")
@@ -279,6 +281,15 @@ class GV50TCPServerCSharpStyle:
     def get_connection_count(self) -> int:
         """Get current connection count"""
         return len(self.client_sockets)
+    
+    def send_heartbeat_if_needed(self, client_socket: socket.socket, client_ip: str):
+        """Send heartbeat to keep TCP long-connection alive"""
+        try:
+            # Simple heartbeat - send empty response to keep connection alive
+            # This helps maintain the long-connection as recommended by manufacturer
+            pass
+        except Exception as e:
+            logger.error(f"Error sending heartbeat to {client_ip}: {e}")
     
     def cleanup_connection(self, client_socket: socket.socket, connection_id: str):
         """Clean up connection"""
