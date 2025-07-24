@@ -11,13 +11,13 @@ import threading
 from datetime import datetime
 
 # Import GV50 service
-from gv50.config import Config as GV50Config
-from gv50.logger import logger as gv50_logger
-from gv50.tcp_server import tcp_server as gv50_tcp_server
-from gv50.database import db_manager as gv50_db_manager
+from config import Config as GV50Config
+from logger import logger as gv50_logger
+from tcp_server import tcp_server as gv50_tcp_server
+from database import db_manager as gv50_db_manager
 
-class GPSTrackerService:
-    """Main service class for GPS tracker processing - supports multiple device types"""
+class GV50TrackerService:
+    """Main service class for GV50 GPS tracker processing"""
     
     def __init__(self):
         self.running = False
@@ -31,10 +31,10 @@ class GPSTrackerService:
         }
     
     def start(self):
-        """Start all GPS tracker services"""
+        """Start GV50 GPS tracker service"""
         try:
             print("=" * 60)
-            print("GPS Tracker Service Starting")
+            print("GV50 Tracker Service Starting")
             print("=" * 60)
             
             self.running = True
@@ -45,18 +45,12 @@ class GPSTrackerService:
                 self.active_services.append('GV50')
                 print("✓ GV50 service started successfully")
             
-            # Future: Add other device services here
-            # if self._start_gt06_service():
-            #     self.active_services.append('GT06')
-            #     print("✓ GT06 service started successfully")
-            
-            print(f"Active services: {', '.join(self.active_services)}")
-            print("GPS Tracker Service ready")
+            print("GV50 Tracker Service ready")
             
             return len(self.active_services) > 0
             
         except Exception as e:
-            print(f"Error starting service: {e}")
+            print(f"Error starting GV50 service: {e}")
             return False
     
     def _start_gv50_service(self):
@@ -160,8 +154,8 @@ class GPSTrackerService:
             return False
     
     def stop(self):
-        """Stop all GPS tracker services"""
-        print("Stopping GPS Tracker Service...")
+        """Stop GV50 GPS tracker service"""
+        print("Stopping GV50 Tracker Service...")
         
         self.running = False
         
@@ -179,7 +173,7 @@ class GPSTrackerService:
         # Log service statistics
         self._log_final_statistics()
         
-        print("GPS Tracker Service stopped")
+        print("GV50 Tracker Service stopped")
     
     def _get_uptime(self) -> str:
         """Get service uptime"""
@@ -220,7 +214,7 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     # Create and start service
-    service = GPSTrackerService()
+    service = GV50TrackerService()
     signal_handler.service = service  # Store reference for signal handler
     
     try:
@@ -229,7 +223,7 @@ def main():
             while service.running:
                 time.sleep(1)
         else:
-            print("Failed to start GPS Tracker Service")
+            print("Failed to start GV50 Tracker Service")
             sys.exit(1)
             
     except KeyboardInterrupt:

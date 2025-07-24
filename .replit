@@ -21,7 +21,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pip install pymongo python-dotenv && python main.py"
+args = "cd gv50 && pip install pymongo python-dotenv && python main.py"
 waitForPort = 5000
 
 [[ports]]

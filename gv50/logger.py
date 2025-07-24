@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from gv50.config import Config
+from config import Config
 
 class GV50Logger:
     """Simplified logger with only LOGGING_ENABLED option"""
