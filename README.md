@@ -6,8 +6,8 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 ```
 ├── .env                       # Environment configuration (root)
-├── deps.txt                   # Python dependencies
 ├── gv50/                      # Complete GV50 service
+│   ├── deps.txt              # Python dependencies
 │   ├── main.py               # Main service entry point
 │   ├── config.py             # Configuration management
 │   ├── database.py           # MongoDB database manager
@@ -64,6 +64,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 2. **Install Python dependencies:**
    ```bash
+   cd gv50
    pip install -r deps.txt
    ```
 
@@ -82,6 +83,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 1. **Download and extract the source code**
 2. **Install dependencies:**
    ```bash
+   cd gv50
    pip install -r deps.txt
    ```
    Or manually:
