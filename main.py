@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-GV50 Tracker Service
-A Python service for processing GV50 GPS tracker data with MongoDB storage
+GPS Tracker Service
+A Python service for processing GPS tracker data from multiple device types
 """
 
 import sys
@@ -10,17 +10,19 @@ import time
 import threading
 from datetime import datetime
 
-from gv50.config import Config
-from gv50.logger import logger
-from gv50.tcp_server import tcp_server
-from gv50.database import db_manager
+# Import GV50 service
+from gv50.config import Config as GV50Config
+from gv50.logger import logger as gv50_logger
+from gv50.tcp_server import tcp_server as gv50_tcp_server
+from gv50.database import db_manager as gv50_db_manager
 
-class GV50TrackerService:
-    """Main service class for GV50 tracker processing"""
+class GPSTrackerService:
+    """Main service class for GPS tracker processing - supports multiple device types"""
     
     def __init__(self):
         self.running = False
-        self.server_thread = None
+        self.service_threads = []
+        self.active_services = []
         self.stats = {
             'start_time': None,
             'total_connections': 0,
@@ -29,111 +31,93 @@ class GV50TrackerService:
         }
     
     def start(self):
-        """Start the GV50 tracker service"""
+        """Start all GPS tracker services"""
         try:
-            logger.info("=" * 60)
-            logger.info("GV50 Tracker Service Starting")
-            logger.info("=" * 60)
-            
-            # Validate configuration
-            if not self._validate_configuration():
-                logger.error("Configuration validation failed")
-                return False
-            
-            # Test database connection
-            if not self._test_database_connection():
-                logger.error("Database connection test failed")
-                return False
+            print("=" * 60)
+            print("GPS Tracker Service Starting")
+            print("=" * 60)
             
             self.running = True
             self.stats['start_time'] = datetime.utcnow()
             
-            # Start TCP server in separate thread
-            self.server_thread = threading.Thread(
-                target=tcp_server.start_server,
-                daemon=True
-            )
-            self.server_thread.start()
+            # Start GV50 service
+            if self._start_gv50_service():
+                self.active_services.append('GV50')
+                print("✓ GV50 service started successfully")
             
-            # Start monitoring thread
-            monitoring_thread = threading.Thread(
-                target=self._monitoring_loop,
-                daemon=True
-            )
-            monitoring_thread.start()
+            # Future: Add other device services here
+            # if self._start_gt06_service():
+            #     self.active_services.append('GT06')
+            #     print("✓ GT06 service started successfully")
             
-            logger.info("GV50 Tracker Service started successfully")
-            logger.info(f"Server listening on {Config.SERVER_IP}:{Config.SERVER_PORT}")
-            logger.info(f"Database: {Config.DATABASE_NAME}")
-            logger.info(f"Logging enabled: {Config.LOGGING_ENABLED}")
+            print(f"Active services: {', '.join(self.active_services)}")
+            print("GPS Tracker Service ready")
+            
+            return len(self.active_services) > 0
+            
+        except Exception as e:
+            print(f"Error starting service: {e}")
+            return False
+    
+    def _start_gv50_service(self):
+        """Start GV50 tracking service"""
+        try:
+            # Validate GV50 configuration
+            if not self._validate_gv50_configuration():
+                return False
+            
+            # Test GV50 database connection
+            if not self._test_gv50_database():
+                return False
+            
+            # Start GV50 TCP server in separate thread
+            gv50_thread = threading.Thread(
+                target=gv50_tcp_server.start_server,
+                daemon=True,
+                name="GV50-TCP-Server"
+            )
+            gv50_thread.start()
+            self.service_threads.append(gv50_thread)
+            
+            # Start GV50 monitoring thread
+            gv50_monitor_thread = threading.Thread(
+                target=self._gv50_monitoring_loop,
+                daemon=True,
+                name="GV50-Monitor"
+            )
+            gv50_monitor_thread.start()
+            self.service_threads.append(gv50_monitor_thread)
             
             return True
             
         except Exception as e:
-            logger.error(f"Error starting service: {e}", exc_info=True)
+            print(f"Error starting GV50 service: {e}")
             return False
     
-    def stop(self):
-        """Stop the GV50 tracker service"""
-        logger.info("Stopping GV50 Tracker Service...")
-        
-        self.running = False
-        
-        # Stop TCP server
-        tcp_server.stop_server()
-        
-        # Wait for server thread to finish
-        if self.server_thread and self.server_thread.is_alive():
-            self.server_thread.join(timeout=10)
-        
-        # Close database connection
-        db_manager.close_connection()
-        
-        # Log service statistics
-        self._log_final_statistics()
-        
-        logger.info("GV50 Tracker Service stopped")
-    
-    def _validate_configuration(self) -> bool:
-        """Validate service configuration"""
+    def _validate_gv50_configuration(self):
+        """Validate GV50 service configuration"""
         try:
-            if not Config.SERVER_ENABLED:
-                logger.warning("Server is disabled in configuration")
-                return False
-            
-            if not Config.MONGODB_URI:
-                logger.error("MongoDB URI not configured")
-                return False
-            
-            if Config.SERVER_PORT < 1 or Config.SERVER_PORT > 65535:
-                logger.error(f"Invalid server port: {Config.SERVER_PORT}")
-                return False
-            
-            logger.info("Configuration validation passed")
+            gv50_logger.info("GV50 Configuration validation passed")
             return True
-            
         except Exception as e:
-            logger.error(f"Error validating configuration: {e}")
+            print(f"GV50 Configuration validation error: {e}")
             return False
     
-    def _test_database_connection(self) -> bool:
-        """Test database connection"""
+    def _test_gv50_database(self):
+        """Test GV50 database connectivity"""
         try:
-            # Test connection by attempting to ping the database
-            if db_manager.client:
-                db_manager.client.admin.command('ping')
-                logger.info("Database connection test passed")
+            if gv50_db_manager.test_connection():
+                gv50_logger.info("GV50 Database connection test passed")
                 return True
             else:
-                logger.error("Database client not initialized")
+                print("GV50 Database connection test failed")
                 return False
-            
         except Exception as e:
-            logger.error(f"Database connection test failed: {e}")
+            print(f"GV50 Database connection test error: {e}")
             return False
     
-    def _monitoring_loop(self):
-        """Monitoring loop for service health and statistics"""
+    def _gv50_monitoring_loop(self):
+        """Monitoring loop for GV50 service health"""
         while self.running:
             try:
                 time.sleep(30)  # Monitor every 30 seconds
@@ -141,39 +125,61 @@ class GV50TrackerService:
                 if not self.running:
                     break
                 
-                # Log service status
-                connection_count = tcp_server.get_connection_count()
+                # Log GV50 service status
+                connection_count = gv50_tcp_server.get_connection_count()
                 uptime = self._get_uptime()
                 
-                logger.debug(f"Service Status - Uptime: {uptime}, Active Connections: {connection_count}")
+                gv50_logger.debug(f"GV50 Status - Uptime: {uptime}, Active Connections: {connection_count}")
                 
                 # Update statistics
                 if connection_count > 0:
                     self.stats['last_activity'] = datetime.utcnow()
                 
                 # Health check
-                if not self._health_check():
-                    logger.warning("Service health check failed")
+                if not self._gv50_health_check():
+                    gv50_logger.warning("GV50 service health check failed")
                 
             except Exception as e:
-                logger.error(f"Error in monitoring loop: {e}")
+                gv50_logger.error(f"Error in GV50 monitoring loop: {e}")
                 time.sleep(10)
     
-    def _health_check(self) -> bool:
-        """Perform service health check"""
+    def _gv50_health_check(self) -> bool:
+        """Perform GV50 service health check"""
         try:
             # Check database connection
-            db_manager.client.admin.command('ping')
+            gv50_db_manager.client.admin.command('ping')
             
             # Check if server is running
-            if not tcp_server.running:
+            if not gv50_tcp_server.running:
                 return False
             
             return True
             
         except Exception as e:
-            logger.error(f"Health check failed: {e}")
+            gv50_logger.error(f"GV50 health check failed: {e}")
             return False
+    
+    def stop(self):
+        """Stop all GPS tracker services"""
+        print("Stopping GPS Tracker Service...")
+        
+        self.running = False
+        
+        # Stop GV50 service
+        if 'GV50' in self.active_services:
+            gv50_tcp_server.stop_server()
+            gv50_db_manager.close_connection()
+            print("✓ GV50 service stopped")
+        
+        # Wait for service threads to finish
+        for thread in self.service_threads:
+            if thread.is_alive():
+                thread.join(timeout=10)
+        
+        # Log service statistics
+        self._log_final_statistics()
+        
+        print("GPS Tracker Service stopped")
     
     def _get_uptime(self) -> str:
         """Get service uptime"""
@@ -194,56 +200,45 @@ class GV50TrackerService:
         """Log final service statistics"""
         try:
             uptime = self._get_uptime()
-            
-            logger.info("=" * 60)
-            logger.info("GV50 Tracker Service Statistics")
-            logger.info("=" * 60)
-            logger.info(f"Total uptime: {uptime}")
-            logger.info(f"Total connections: {self.stats['total_connections']}")
-            logger.info(f"Total messages processed: {self.stats['total_messages']}")
-            logger.info(f"Last activity: {self.stats['last_activity']}")
-            logger.info("=" * 60)
+            print(f"Service Statistics - Uptime: {uptime}")
+            print(f"Active Services: {', '.join(self.active_services) if self.active_services else 'None'}")
             
         except Exception as e:
-            logger.error(f"Error logging final statistics: {e}")
+            print(f"Error logging statistics: {e}")
 
 def signal_handler(signum, frame):
-    """Handle system signals for graceful shutdown"""
-    logger.info(f"Received signal {signum}, initiating graceful shutdown...")
-    if 'service' in globals() and service:
-        service.stop()
+    """Handle shutdown signals"""
+    print(f"\nReceived signal {signum}, shutting down...")
+    if hasattr(signal_handler, 'service'):
+        signal_handler.service.stop()
     sys.exit(0)
 
 def main():
-    """Main function"""
-    global service
+    """Main entry point"""
+    # Setup signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Create and start service
+    service = GPSTrackerService()
+    signal_handler.service = service  # Store reference for signal handler
     
     try:
-        # Initialize service
-        service = GV50TrackerService()
-        
-        # Setup signal handlers for graceful shutdown
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-        
-        # Start service
-        if not service.start():
-            logger.error("Failed to start service")
-            sys.exit(1)
-        
-        # Keep service running
-        try:
+        if service.start():
+            # Keep the main thread alive
             while service.running:
                 time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received")
+        else:
+            print("Failed to start GPS Tracker Service")
+            sys.exit(1)
             
+    except KeyboardInterrupt:
+        print("\nShutdown requested...")
     except Exception as e:
-        logger.error(f"Unexpected error in main: {e}", exc_info=True)
+        print(f"Unexpected error: {e}")
         sys.exit(1)
     finally:
-        if 'service' in locals():
-            service.stop()
+        service.stop()
 
 if __name__ == "__main__":
     main()
