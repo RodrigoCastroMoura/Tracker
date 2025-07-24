@@ -93,7 +93,7 @@ The application follows a modular architecture with clear separation of concerns
 #### Data Models (`models.py`)
 - **VehicleData**: Individual GPS tracking records with location data only:
   - imei, longitude, latitude, altitude, timestamp (server timestamp), deviceTimestamp (device timestamp), systemDate (system timestamp), mensagem_raw
-- **Vehicle**: Device/vehicle information, current status, control states, ignition status, speed, and battery levels
+- **Vehicle**: Device/vehicle information with new structure - IMEI, dsplaca, dsmodelo, comandobloqueo, bloqueado, comandotrocarip, ignicao, bateriavoltagem, bateriabaixa, ultimoalertabateria, tsusermanu
 
 #### Configuration (`config.py`)
 - Environment-based configuration management

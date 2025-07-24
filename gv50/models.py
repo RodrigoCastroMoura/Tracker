@@ -20,30 +20,25 @@ class VehicleData:
 
 @dataclass
 class Vehicle:
-    """Vehicle information model - inclui speed, ignition e battery_level"""
-    imei: str
-    plate_number: Optional[str] = None
-    model: Optional[str] = None
-    year: Optional[int] = None
-    owner_cpf: Optional[str] = None
-    chip_number: Optional[str] = None
-    is_blocked: Optional[bool] = False
-    ignition_status: Optional[bool] = None
-    speed: Optional[str] = None  # Movido da VehicleData para Vehicle
-    battery_level: Optional[str] = None
-    last_location: Optional[Dict[str, str]] = None
-    last_update: Optional[datetime] = None
-    last_raw_message: Optional[str] = None
-    current_ip: Optional[str] = None
-    status: Optional[str] = "active"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    """Vehicle information model - estrutura conforme solicitado"""
+    IMEI: str  # Campo obrigatório primeiro
+    id: Optional[str] = None
+    dsplaca: Optional[str] = None  # Placa do veículo
+    dsmodelo: Optional[str] = None  # Modelo do veículo
+    comandobloqueo: Optional[bool] = None  # True = bloquear, False = desbloquear, None = sem comando
+    bloqueado: Optional[bool] = False  # Status atual de bloqueio
+    comandotrocarip: Optional[bool] = None  # True = comando para trocar IP pendente
+    ignicao: bool = False  # Status da ignição
+    # Campos para monitoramento de bateria
+    bateriavoltagem: Optional[float] = None  # Voltagem atual da bateria
+    bateriabaixa: Optional[bool] = False  # True se bateria estiver baixa
+    ultimoalertabateria: Optional[datetime] = None  # Timestamp do último alerta
+    tsusermanu: Optional[datetime] = None  # Última atualização manual
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for MongoDB operations"""
         data = asdict(self)
         now = datetime.utcnow()
-        if self.created_at is None:
-            data['created_at'] = now
-        data['updated_at'] = now
+        if self.tsusermanu is None:
+            data['tsusermanu'] = now
         return data

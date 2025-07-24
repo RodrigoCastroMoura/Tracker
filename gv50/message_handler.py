@@ -71,51 +71,46 @@ class MessageHandler:
             # Get existing vehicle or create new one
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             
-            # Prepare vehicle data
+            # Prepare vehicle data with new structure
             vehicle_data = {
-                'imei': imei,
-                'current_ip': client_ip,
-                'last_raw_message': raw_message,
-                'last_update': datetime.utcnow()
+                'IMEI': imei,
+                'tsusermanu': datetime.utcnow()
             }
             
-            # Update ignition status if available - salva apenas na tabela vehicles
+            # Update ignition status if available
             if 'ignition' in parsed_data:
-                vehicle_data['ignition_status'] = parsed_data['ignition']
+                vehicle_data['ignicao'] = parsed_data['ignition']
                 if parsed_data['ignition']:
                     logger.info(f"Ignition ON detected for IMEI {imei}")
                 else:
                     logger.info(f"Ignition OFF detected for IMEI {imei}")
             
-            # Update speed if available - salva apenas na tabela vehicles  
-            if parsed_data.get('speed'):
-                vehicle_data['speed'] = parsed_data['speed']
-            
-            # Update battery level if available - salva apenas na tabela vehicles
+            # Update battery level if available
             if parsed_data.get('battery_level'):
-                vehicle_data['battery_level'] = parsed_data['battery_level']
-                # Simple battery level logging
                 try:
-                    battery_level = float(parsed_data['battery_level'])
-                    if battery_level < 10:
-                        logger.warning(f"Critical battery level for IMEI {imei}: {battery_level}%")
-                    elif battery_level < 20:
-                        logger.info(f"Low battery level for IMEI {imei}: {battery_level}%")
+                    battery_voltage = float(parsed_data['battery_level'])
+                    vehicle_data['bateriavoltagem'] = battery_voltage
+                    
+                    # Check for low battery
+                    if battery_voltage < 10.0:
+                        vehicle_data['bateriabaixa'] = True
+                        vehicle_data['ultimoalertabateria'] = datetime.utcnow()
+                        logger.warning(f"Critical battery level for IMEI {imei}: {battery_voltage}V")
+                    elif battery_voltage < 12.0:
+                        vehicle_data['bateriabaixa'] = True
+                        logger.info(f"Low battery level for IMEI {imei}: {battery_voltage}V")
+                    else:
+                        vehicle_data['bateriabaixa'] = False
                 except (ValueError, TypeError):
                     pass
             
-            # Update location if available
-            if parsed_data.get('latitude') and parsed_data.get('longitude'):
-                vehicle_data['last_location'] = {
-                    'latitude': parsed_data['latitude'],
-                    'longitude': parsed_data['longitude'],
-                    'timestamp': parsed_data.get('device_timestamp', str(datetime.utcnow()))
-                }
-            
             # Handle blocking/unblocking commands
             if parsed_data.get('report_type') == 'GTOUT':
-                vehicle_data['is_blocked'] = True
-                logger.info(f"Vehicle blocking command processed for IMEI {imei}")
+                # Process blocking command response
+                if parsed_data.get('command_result'):
+                    vehicle_data['bloqueado'] = True
+                    vehicle_data['comandobloqueo'] = None  # Clear pending command
+                    logger.info(f"Vehicle blocking command confirmed for IMEI {imei}")
             
             # Merge with existing data if available
             if existing_vehicle:
@@ -154,14 +149,14 @@ class MessageHandler:
             logger.error(f"Error saving vehicle data: {e}")
     
     def update_vehicle_ignition(self, imei: str, ignition_status: bool):
-        """Update vehicle ignition status - C# style method"""
+        """Update vehicle ignition status - new structure"""
         try:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             if existing_vehicle:
                 vehicle_data = {
-                    'imei': imei,
-                    'ignition_status': ignition_status,
-                    'last_update': datetime.utcnow()
+                    'IMEI': imei,
+                    'ignicao': ignition_status,
+                    'tsusermanu': datetime.utcnow()
                 }
                 vehicle = Vehicle(**vehicle_data)
                 db_manager.upsert_vehicle(vehicle)
@@ -170,21 +165,53 @@ class MessageHandler:
             logger.error(f"Error updating vehicle ignition: {e}")
     
     def update_vehicle_blocking(self, imei: str, blocked: bool):
-        """Update vehicle blocking status - C# style method"""
+        """Update vehicle blocking status - new structure with command logic"""
         try:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             if existing_vehicle:
                 vehicle_data = {
-                    'imei': imei,
-                    'is_blocked': blocked,
-                    'blocked_reason': "Remote command" if blocked else None,
-                    'last_update': datetime.utcnow()
+                    'IMEI': imei,
+                    'bloqueado': blocked,
+                    'comandobloqueo': None,  # Clear command after execution
+                    'tsusermanu': datetime.utcnow()
                 }
                 vehicle = Vehicle(**vehicle_data)
                 db_manager.upsert_vehicle(vehicle)
                 logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
         except Exception as e:
             logger.error(f"Error updating vehicle blocking: {e}")
+    
+    def set_blocking_command(self, imei: str, should_block: bool):
+        """Set pending blocking command for vehicle"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            if existing_vehicle:
+                vehicle_data = {
+                    'IMEI': imei,
+                    'comandobloqueo': should_block,  # True to block, False to unblock
+                    'tsusermanu': datetime.utcnow()
+                }
+                vehicle = Vehicle(**vehicle_data)
+                db_manager.upsert_vehicle(vehicle)
+                logger.info(f"Set blocking command for {imei}: {'block' if should_block else 'unblock'}")
+        except Exception as e:
+            logger.error(f"Error setting blocking command: {e}")
+    
+    def set_ip_change_command(self, imei: str):
+        """Set pending IP change command for vehicle"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            if existing_vehicle:
+                vehicle_data = {
+                    'IMEI': imei,
+                    'comandotrocarip': True,
+                    'tsusermanu': datetime.utcnow()
+                }
+                vehicle = Vehicle(**vehicle_data)
+                db_manager.upsert_vehicle(vehicle)
+                logger.info(f"Set IP change command for {imei}")
+        except Exception as e:
+            logger.error(f"Error setting IP change command: {e}")
 
 # Global message handler instance
 message_handler = MessageHandler()
