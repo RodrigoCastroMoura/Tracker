@@ -33,7 +33,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 ### GV50 GPS Tracker
 - **Protocol**: Queclink @Track V4.01
 - **Message Types**: GTFRI (location), GTIGN/GTIGF (ignition), GTOUT (control)
-- **Port**: 5000 (TCP)
+- **Port**: Configurável via .env (padrão: 5000 TCP, ajuste conforme necessário)
 - **Features**: Real-time tracking, ignition detection, acknowledgment responses
 
 ## Database Schema
@@ -71,6 +71,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 3. **Configure environment variables:**
    ```bash
    nano .env  # Edit configuration file in root directory
+   # Important: Set SERVER_PORT to match your GPS device configuration
    ```
 
 4. **Run the service:**
