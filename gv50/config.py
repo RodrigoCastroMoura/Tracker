@@ -27,6 +27,7 @@ class Config:
     DEFAULT_PASSWORD: str = os.getenv('DEFAULT_PASSWORD', 'gv50')
     HEARTBEAT_INTERVAL: int = int(os.getenv('HEARTBEAT_INTERVAL', '30'))
     CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '300'))
+    MAX_CONNECTIONS: int = int(os.getenv('MAX_CONNECTIONS', '100'))
     
     @classmethod
     def is_ip_allowed(cls, ip: str) -> bool:

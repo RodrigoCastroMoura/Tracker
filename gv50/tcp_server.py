@@ -27,7 +27,7 @@ class GV50TCPServer:
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.server_socket.bind((Config.SERVER_IP, Config.SERVER_PORT))
-            self.server_socket.listen(100)  # Allow up to 100 concurrent connections
+            self.server_socket.listen(Config.MAX_CONNECTIONS)  # Allow concurrent connections from .env
             
             self.running = True
             logger.info(f"GV50 TCP Server started on {Config.SERVER_IP}:{Config.SERVER_PORT}")
