@@ -27,11 +27,17 @@ class QueclinkProtocolParser:
             if not message_type:
                 return {'error': 'Unknown message type'}
             
-            # Parse GTFRI with flexible field-based approach
+            # Parse all protocols with field-based approach like C#
             if message_type == 'GTFRI':
                 return self._parse_gtfri(message)
+            elif message_type == 'GTIGN':
+                return self._parse_gtign(message)
+            elif message_type == 'GTIGF':
+                return self._parse_gtigf(message)
+            elif message_type == 'GTOUT':
+                return self._parse_gtout(message)
             
-            # Use regex patterns for other message types
+            # Fallback to regex patterns for unknown types
             pattern = self.message_patterns.get(message_type)
             if not pattern:
                 return {'error': f'No pattern for message type: {message_type}'}
@@ -44,12 +50,6 @@ class QueclinkProtocolParser:
             # Extract data from the match
             data = match.groupdict()
             data['report_type'] = message_type
-            
-            # Handle ignition status based on message type
-            if message_type == 'GTIGN':
-                data['ignition'] = True
-            elif message_type == 'GTIGF':
-                data['ignition'] = False
             
             # Convert numeric fields
             self._convert_numeric_fields(data)
@@ -116,6 +116,121 @@ class QueclinkProtocolParser:
         except Exception as e:
             logger.error(f"Error parsing GTFRI: {e}")
             return {'error': f'GTFRI parse error: {str(e)}'}
+    
+    def _parse_gtign(self, message: str) -> Dict[str, str]:
+        """Parse GTIGN message based on C# implementation"""
+        try:
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid message structure'}
+            
+            msg_type = msg_parts[0]
+            data_part = msg_parts[1]
+            fields = data_part.split(',')
+            
+            if len(fields) < 12:
+                return {'error': f'Insufficient fields in GTIGN: {len(fields)}'}
+            
+            # Map fields according to C# implementation:
+            # C# GTIGN: comando[2]=IMEI, comando[6]=speed, comando[8]=altitude, comando[9]=longitude, comando[10]=latitude, comando[11]=dataDevice
+            data = {
+                'msg_type': msg_type,
+                'report_type': 'GTIGN',
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',
+                'device_name': fields[3] if len(fields) > 3 else '',
+                'report_id': fields[4] if len(fields) > 4 else '',
+                'report_type_field': fields[5] if len(fields) > 5 else '',
+                'speed': fields[6] if len(fields) > 6 else '0',  # comando[6] no C#
+                'course': fields[7] if len(fields) > 7 else '0',
+                'altitude': fields[8] if len(fields) > 8 else '0',  # comando[8] no C#
+                'longitude': fields[9] if len(fields) > 9 else '0',  # comando[9] no C#
+                'latitude': fields[10] if len(fields) > 10 else '0',  # comando[10] no C#
+                'device_timestamp': fields[11] if len(fields) > 11 else '',  # comando[11] no C#
+                'ignition': True  # GTIGN = ignição ligada
+            }
+            
+            self._convert_numeric_fields(data)
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTIGN: {e}")
+            return {'error': f'GTIGN parse error: {str(e)}'}
+    
+    def _parse_gtigf(self, message: str) -> Dict[str, str]:
+        """Parse GTIGF message based on C# implementation"""
+        try:
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid message structure'}
+            
+            msg_type = msg_parts[0]
+            data_part = msg_parts[1]
+            fields = data_part.split(',')
+            
+            if len(fields) < 12:
+                return {'error': f'Insufficient fields in GTIGF: {len(fields)}'}
+            
+            # Map fields according to C# implementation (same as GTIGN)
+            # C# GTIGF: comando[2]=IMEI, comando[6]=speed, comando[8]=altitude, comando[9]=longitude, comando[10]=latitude, comando[11]=dataDevice
+            data = {
+                'msg_type': msg_type,
+                'report_type': 'GTIGF',
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',
+                'device_name': fields[3] if len(fields) > 3 else '',
+                'report_id': fields[4] if len(fields) > 4 else '',
+                'report_type_field': fields[5] if len(fields) > 5 else '',
+                'speed': fields[6] if len(fields) > 6 else '0',  # comando[6] no C#
+                'course': fields[7] if len(fields) > 7 else '0',
+                'altitude': fields[8] if len(fields) > 8 else '0',  # comando[8] no C#
+                'longitude': fields[9] if len(fields) > 9 else '0',  # comando[9] no C#
+                'latitude': fields[10] if len(fields) > 10 else '0',  # comando[10] no C#
+                'device_timestamp': fields[11] if len(fields) > 11 else '',  # comando[11] no C#
+                'ignition': False  # GTIGF = ignição desligada
+            }
+            
+            self._convert_numeric_fields(data)
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTIGF: {e}")
+            return {'error': f'GTIGF parse error: {str(e)}'}
+    
+    def _parse_gtout(self, message: str) -> Dict[str, str]:
+        """Parse GTOUT message based on C# implementation"""
+        try:
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid message structure'}
+            
+            msg_type = msg_parts[0]
+            data_part = msg_parts[1]
+            fields = data_part.split(',')
+            
+            if len(fields) < 5:
+                return {'error': f'Insufficient fields in GTOUT: {len(fields)}'}
+            
+            # Map fields according to C# implementation:
+            # C# GTOUT: comando[2]=IMEI, comando[4]=status (0000=bloqueado, outros=desbloqueado)
+            data = {
+                'msg_type': msg_type,
+                'report_type': 'GTOUT',
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',
+                'device_name': fields[3] if len(fields) > 3 else '',
+                'status': fields[4] if len(fields) > 4 else '',  # comando[4] no C#
+                'blocked': fields[4] == '0000' if len(fields) > 4 else False  # 0000 = bloqueado
+            }
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTOUT: {e}")
+            return {'error': f'GTOUT parse error: {str(e)}'}
     
     def _convert_numeric_fields(self, data: Dict[str, str]):
         """Convert numeric fields to proper format"""
