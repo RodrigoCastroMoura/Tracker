@@ -80,8 +80,8 @@ class GV50TCPServer:
             
             while self.running:
                 try:
-                    # Receive data from client
-                    data = client_socket.recv(4096)
+                    # Receive data from client - usar buffer maior como no C#
+                    data = client_socket.recv(65536)  # 64KB buffer como no C#
                     
                     if not data:
                         logger.info(f"Client {connection_id} disconnected")
@@ -89,41 +89,27 @@ class GV50TCPServer:
                     
                     # Decode message
                     try:
-                        chunk = data.decode('utf-8')
+                        raw_message = data.decode('utf-8').strip()
                     except UnicodeDecodeError:
-                        chunk = data.decode('latin-1')
+                        raw_message = data.decode('latin-1').strip()
                     
-                    # Add to buffer
-                    message_buffer += chunk
-                    
-                    # Prevent buffer overflow
-                    if len(message_buffer) > 8192:  # 8KB limit
-                        logger.warning(f"Message buffer overflow for {connection_id}, clearing buffer")
-                        message_buffer = ""
+                    if not raw_message:
                         continue
+                        
+                    logger.debug(f"Received from {connection_id}: {raw_message}")
                     
-                    # Process complete messages (terminated by $ or \r\n)
-                    while '$' in message_buffer:
-                        # Find complete message
-                        end_index = message_buffer.find('$')
-                        complete_message = message_buffer[:end_index + 1].strip()
-                        message_buffer = message_buffer[end_index + 1:]
-                        
-                        if not complete_message:
-                            continue
-                        
-                        logger.debug(f"Received from {connection_id}: {complete_message}")
-                        
-                        # Parse message
-                        parsed_data = protocol_parser.parse_message(complete_message)
+                    # Se a mensagem tem '$' no final, está completa
+                    if raw_message.endswith('$'):
+                        # Processar mensagem completa
+                        parsed_data = protocol_parser.parse_message(raw_message)
                         
                         if 'error' in parsed_data:
                             logger.warning(f"Parse error from {connection_id}: {parsed_data['error']}")
-                            logger.debug(f"Raw message that failed: {complete_message}")
+                            logger.debug(f"Raw message that failed: {raw_message}")
                             continue
                         
                         # Process message and get response
-                        response = message_handler.handle_incoming_message(complete_message, client_ip)
+                        response = message_handler.handle_incoming_message(raw_message, client_ip)
                         
                         # Send acknowledgment if available
                         if response:
@@ -138,6 +124,44 @@ class GV50TCPServer:
                         imei = parsed_data.get('imei')
                         if imei:
                             self.send_pending_commands(client_socket, imei, connection_id)
+                    else:
+                        # Mensagem incompleta - adicionar ao buffer
+                        message_buffer += raw_message
+                        
+                        # Verificar se agora temos mensagem completa no buffer
+                        if '$' in message_buffer:
+                            while '$' in message_buffer:
+                                end_index = message_buffer.find('$')
+                                complete_message = message_buffer[:end_index + 1].strip()
+                                message_buffer = message_buffer[end_index + 1:]
+                                
+                                if not complete_message:
+                                    continue
+                                
+                                logger.debug(f"Complete message from buffer {connection_id}: {complete_message}")
+                                
+                                # Parse message
+                                parsed_data = protocol_parser.parse_message(complete_message)
+                                
+                                if 'error' in parsed_data:
+                                    logger.warning(f"Parse error from {connection_id}: {parsed_data['error']}")
+                                    continue
+                                
+                                # Process message
+                                response = message_handler.handle_incoming_message(complete_message, client_ip)
+                                
+                                if response:
+                                    try:
+                                        client_socket.send(response.encode('utf-8'))
+                                        logger.debug(f"Sent to {connection_id}: {response}")
+                                    except socket.error as e:
+                                        logger.error(f"Error sending response to {connection_id}: {e}")
+                                        break
+                                
+                                # Check for pending commands
+                                imei = parsed_data.get('imei')
+                                if imei:
+                                    self.send_pending_commands(client_socket, imei, connection_id)
                     
                 except socket.timeout:
                     logger.debug(f"Socket timeout for {connection_id}")

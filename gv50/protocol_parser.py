@@ -62,40 +62,49 @@ class QueclinkProtocolParser:
             return {'error': f'Parse error: {str(e)}'}
     
     def _parse_gtfri(self, message: str) -> Dict[str, str]:
-        """Parse GTFRI message with field-based approach"""
+        """Parse GTFRI message based on C# implementation"""
         try:
             # Remove prefix and suffix
             if not message.startswith('+') or not message.endswith('$'):
                 return {'error': 'Invalid message format'}
             
-            # Split by comma
-            parts = message[1:-1].split(',')  # Remove + and $
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid message structure'}
             
-            if len(parts) < 18:  # Minimum required fields
-                return {'error': f'Insufficient fields in GTFRI: {len(parts)}'}
+            msg_type = msg_parts[0]  # RESP, BUFF, ACK
+            data_part = msg_parts[1]
             
-            # Map fields according to GTFRI protocol
+            # Split data part by comma
+            fields = data_part.split(',')
+            
+            if len(fields) < 14:  # Minimum required fields based on C# code
+                return {'error': f'Insufficient fields in GTFRI: {len(fields)}'}
+            
+            # Map fields according to C# implementation:
+            # C# GTFRI: comando[2]=IMEI, comando[8]=speed, comando[10]=altitude, comando[11]=longitude, comando[12]=latitude, comando[13]=dataDevice
             data = {
-                'msg_type': parts[0].split(':')[0] if ':' in parts[0] else 'RESP',
+                'msg_type': msg_type,
                 'report_type': 'GTFRI',
-                'protocol_version': parts[1] if len(parts) > 1 else '',
-                'imei': parts[2] if len(parts) > 2 else '',
-                'device_name': parts[3] if len(parts) > 3 else '',
-                'reserved1': parts[4] if len(parts) > 4 else '',
-                'gps_accuracy': parts[5] if len(parts) > 5 else '0',
-                'speed': parts[6] if len(parts) > 6 else '0',
-                'course': parts[7] if len(parts) > 7 else '0',
-                'altitude': parts[8] if len(parts) > 8 else '0',
-                'longitude': parts[9] if len(parts) > 9 else '0',
-                'latitude': parts[10] if len(parts) > 10 else '0',
-                'device_timestamp': parts[11] if len(parts) > 11 else '',
-                'mcc': parts[12] if len(parts) > 12 else '',
-                'mnc': parts[13] if len(parts) > 13 else '',
-                'lac': parts[14] if len(parts) > 14 else '',
-                'cell_id': parts[15] if len(parts) > 15 else '',
-                'reserved2': parts[16] if len(parts) > 16 else '',
-                'odometer': parts[17] if len(parts) > 17 else '0',
-                'count': parts[18] if len(parts) > 18 else '0'
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',  # comando[2] no C#
+                'device_name': fields[3] if len(fields) > 3 else '',
+                'reserved1': fields[4] if len(fields) > 4 else '',
+                'gps_accuracy': fields[5] if len(fields) > 5 else '0',
+                'speed': fields[8] if len(fields) > 8 else '0',  # comando[8] no C# para GTFRI
+                'course': fields[7] if len(fields) > 7 else '0',
+                'altitude': fields[10] if len(fields) > 10 else '0',  # comando[10] no C#
+                'longitude': fields[11] if len(fields) > 11 else '0',  # comando[11] no C#
+                'latitude': fields[12] if len(fields) > 12 else '0',   # comando[12] no C#
+                'device_timestamp': fields[13] if len(fields) > 13 else '',  # comando[13] no C#
+                'mcc': fields[14] if len(fields) > 14 else '',
+                'mnc': fields[15] if len(fields) > 15 else '',
+                'lac': fields[16] if len(fields) > 16 else '',
+                'cell_id': fields[17] if len(fields) > 17 else '',
+                'reserved2': fields[18] if len(fields) > 18 else '',
+                'odometer': fields[19] if len(fields) > 19 else '0',
+                'count': fields[20] if len(fields) > 20 else '0'
             }
             
             # Convert numeric fields
