@@ -21,7 +21,7 @@ class Config:
     
     # Database Configuration - do .env
     MONGODB_URI: str = os.getenv('MONGODB_URI', '')
-    DATABASE_NAME: str = os.getenv('DATABASE_NAME', 'tracker')
+    DATABASE_NAME: str = os.getenv('DATABASE_NAME', 'track')  # Use 'track' where data exists
     
     # Protocol Configuration - do .env
     DEFAULT_PASSWORD: str = os.getenv('DEFAULT_PASSWORD', 'gv50')
