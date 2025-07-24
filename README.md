@@ -50,6 +50,83 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 ### vehicles
 - Device/vehicle information and current status
 
+## Installation
+
+### Using Git (Recommended)
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd gps-tracker-service
+   ```
+
+2. **Install Python dependencies:**
+   ```bash
+   pip install pymongo python-dotenv
+   ```
+
+3. **Configure environment variables:**
+   ```bash
+   cd gv50
+   nano .env  # Edit configuration as needed
+   ```
+
+4. **Run the service:**
+   ```bash
+   python main.py
+   ```
+
+### Manual Installation
+
+1. **Download and extract the source code**
+2. **Install dependencies:**
+   ```bash
+   pip install pymongo python-dotenv
+   ```
+3. **Configure the `gv50/.env` file with your settings**
+4. **Run the service from the `gv50/` directory**
+
+## Updates
+
+### Updating via Git
+
+1. **Stop the running service:**
+   ```bash
+   # Stop the service (Ctrl+C if running manually)
+   # Or if using systemd: sudo systemctl stop gv50-tracker.service
+   ```
+
+2. **Pull latest changes:**
+   ```bash
+   git pull origin main
+   ```
+
+3. **Update dependencies if needed:**
+   ```bash
+   pip install --upgrade pymongo python-dotenv
+   ```
+
+4. **Restart the service:**
+   ```bash
+   cd gv50
+   python main.py
+   # Or if using systemd: sudo systemctl start gv50-tracker.service
+   ```
+
+### Manual Update
+
+1. **Backup your configuration:**
+   ```bash
+   cp gv50/.env gv50/.env.backup
+   ```
+
+2. **Download and extract new version**
+3. **Restore your configuration:**
+   ```bash
+   cp gv50/.env.backup gv50/.env
+   ```
+4. **Restart the service**
+
 ## Quick Start
 
 1. Configure environment variables (IPs, logging)
