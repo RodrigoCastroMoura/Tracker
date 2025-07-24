@@ -8,25 +8,25 @@ load_dotenv(dotenv_path="../.env")
 class Config:
     """Configuration class for GV50 tracker service"""
     
-    # Service Configuration - fixos
+    # Service Configuration - do .env
     SERVER_ENABLED: bool = True
     SERVER_IP: str = '0.0.0.0'
     SERVER_PORT: int = int(os.getenv('SERVER_PORT', '5000'))
     
-    # IP Management - apenas IPs permitidos (configurável)
+    # IP Management - do .env
     ALLOWED_IPS: List[str] = [ip.strip() for ip in os.getenv('ALLOWED_IPS', '').split(',') if ip.strip()]
     
-    # Logging Configuration - apenas ativar/desativar log
+    # Logging Configuration - do .env
     LOGGING_ENABLED: bool = os.getenv('LOGGING_ENABLED', 'true').lower() == 'true'
     
-    # Database Configuration - fixos
-    MONGODB_URI: str = os.getenv('MONGODB_URI', 'mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/')
+    # Database Configuration - do .env
+    MONGODB_URI: str = os.getenv('MONGODB_URI', '')
     DATABASE_NAME: str = os.getenv('DATABASE_NAME', 'tracker')
     
-    # Protocol Configuration - fixos
-    DEFAULT_PASSWORD: str = 'gv50'
-    HEARTBEAT_INTERVAL: int = 30
-    CONNECTION_TIMEOUT: int = 300
+    # Protocol Configuration - do .env
+    DEFAULT_PASSWORD: str = os.getenv('DEFAULT_PASSWORD', 'gv50')
+    HEARTBEAT_INTERVAL: int = int(os.getenv('HEARTBEAT_INTERVAL', '30'))
+    CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '300'))
     
     @classmethod
     def is_ip_allowed(cls, ip: str) -> bool:
