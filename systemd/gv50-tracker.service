@@ -1,0 +1,27 @@
+[Unit]
+Description=GV50 GPS Tracker Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gv50tracker
+Group=gv50tracker
+WorkingDirectory=/home/gv50tracker/gv50-tracker/gv50
+Environment=PATH=/home/gv50tracker/gv50-tracker/venv/bin
+ExecStart=/home/gv50tracker/gv50-tracker/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gv50-tracker
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/gv50tracker/gv50-tracker/logs
+
+[Install]
+WantedBy=multi-user.target
