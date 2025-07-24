@@ -129,5 +129,64 @@ class MessageHandler:
         except Exception as e:
             logger.error(f"Error updating vehicle info for IMEI {parsed_data.get('imei')}: {e}", exc_info=True)
 
+    def save_vehicle_data(self, vehicle_data: Dict[str, Any]):
+        """Save vehicle data to database - C# style method"""
+        try:
+            # Convert dict to VehicleData object
+            current_time = datetime.utcnow()
+            
+            vehicle_record = VehicleData(
+                imei=vehicle_data.get('imei', ''),
+                longitude=vehicle_data.get('longitude', '0'),
+                latitude=vehicle_data.get('latitude', '0'),
+                altitude=vehicle_data.get('altitude', '0'),
+                speed=vehicle_data.get('speed', '0'),
+                ignition=vehicle_data.get('ignition'),
+                battery_level=None,
+                timestamp=current_time,
+                deviceTimestamp=vehicle_data.get('device_timestamp', ''),
+                systemDate=current_time,
+                mensagem_raw=vehicle_data.get('raw_message', '')
+            )
+            
+            db_manager.insert_vehicle_data(vehicle_record)
+            logger.debug(f"Saved vehicle data for IMEI: {vehicle_data.get('imei')}")
+            
+        except Exception as e:
+            logger.error(f"Error saving vehicle data: {e}")
+    
+    def update_vehicle_ignition(self, imei: str, ignition_status: bool):
+        """Update vehicle ignition status - C# style method"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            if existing_vehicle:
+                vehicle_data = {
+                    'imei': imei,
+                    'ignition_status': ignition_status,
+                    'last_update': datetime.utcnow()
+                }
+                vehicle = Vehicle(**vehicle_data)
+                db_manager.upsert_vehicle(vehicle)
+                logger.info(f"Updated ignition status for {imei}: {ignition_status}")
+        except Exception as e:
+            logger.error(f"Error updating vehicle ignition: {e}")
+    
+    def update_vehicle_blocking(self, imei: str, blocked: bool):
+        """Update vehicle blocking status - C# style method"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            if existing_vehicle:
+                vehicle_data = {
+                    'imei': imei,
+                    'is_blocked': blocked,
+                    'blocked_reason': "Remote command" if blocked else None,
+                    'last_update': datetime.utcnow()
+                }
+                vehicle = Vehicle(**vehicle_data)
+                db_manager.upsert_vehicle(vehicle)
+                logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+        except Exception as e:
+            logger.error(f"Error updating vehicle blocking: {e}")
+
 # Global message handler instance
 message_handler = MessageHandler()
