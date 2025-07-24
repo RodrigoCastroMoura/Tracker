@@ -32,6 +32,7 @@ class MessageHandler:
             self.device_ips[imei] = client_ip
             
             # Create vehicle data record - apenas campos solicitados
+            current_time = datetime.utcnow()
             vehicle_data = VehicleData(
                 imei=imei,
                 longitude=parsed_data.get('longitude'),
@@ -40,8 +41,9 @@ class MessageHandler:
                 speed=parsed_data.get('speed'),
                 ignition=parsed_data.get('ignition'),
                 battery_level=parsed_data.get('battery_level'),
-                timestamp=datetime.utcnow(),
+                timestamp=current_time,
                 deviceTimestamp=parsed_data.get('device_timestamp', ''),
+                systemDate=current_time,
                 mensagem_raw=raw_message
             )
             

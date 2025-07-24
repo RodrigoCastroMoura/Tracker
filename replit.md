@@ -26,8 +26,8 @@ Preferred communication style: Simple, everyday language.
 ✓ Successfully tested with multiple GV50 message types (GTFRI, GTIGN, GTIGF)
 ✓ Confirmed data persistence with 7 records stored across both tables
 ✓ System fully operational and processing GPS tracking data correctly
-✓ Updated VehicleData model: removed 'course' field, added 'timestamp' and 'deviceTimestamp' fields
-✓ All field names now follow English standard: timestamp (datetime), deviceTimestamp (string)
+✓ Updated VehicleData model: removed 'course' field, added 'timestamp', 'deviceTimestamp' and 'systemDate' fields
+✓ All field names now follow English standard: timestamp, deviceTimestamp, systemDate (all datetime fields)
 ✓ Tested new structure with successful data storage and field validation
 
 ## System Architecture
@@ -75,8 +75,8 @@ The application follows a modular architecture with clear separation of concerns
 - Handles connection failures and retries
 
 ### Data Models (`models.py`)
-- **VehicleData**: Individual GPS tracking records with 9 specific fields:
-  - imei, longitude, latitude, altitude, speed, ignition, battery_level, timestamp (server timestamp), deviceTimestamp (device timestamp), mensagem_raw
+- **VehicleData**: Individual GPS tracking records with 10 specific fields:
+  - imei, longitude, latitude, altitude, speed, ignition, battery_level, timestamp (server timestamp), deviceTimestamp (device timestamp), systemDate (system timestamp), mensagem_raw
 - **Vehicle**: Device/vehicle information, current status, control states, ignition status, and battery levels
 
 ## Data Flow

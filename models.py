@@ -14,6 +14,7 @@ class VehicleData:
     battery_level: Optional[str] = None
     timestamp: Optional[datetime] = None
     deviceTimestamp: str = ""
+    systemDate: Optional[datetime] = None
     mensagem_raw: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
