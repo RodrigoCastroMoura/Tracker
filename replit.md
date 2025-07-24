@@ -36,6 +36,8 @@ Preferred communication style: Simple, everyday language.
 ✓ Fixed IP filtering logic to properly recognize 0.0.0.0/0 as "allow all IPs"
 ✓ Added file logging back to logger.py - logs now save to ../logs/ directory
 ✓ Created deps.txt file in gv50/ folder for easy dependency installation
+✓ Fixed message parsing by implementing message buffering for fragmented TCP packets
+✓ Added overflow protection and proper message boundary detection using $ terminator
 
 ## System Architecture
 
