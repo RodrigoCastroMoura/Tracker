@@ -6,16 +6,14 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 ```
 ├── main.py                    # Main service entry point
-├── common/                    # Shared utilities
+├── gv50/                      # Complete GV50 service
 │   ├── config.py             # Configuration management
 │   ├── database.py           # MongoDB database manager
 │   ├── logger.py             # Logging system
-│   └── models.py             # Data models
-├── services/                  # Device-specific services
-│   └── gv50/                 # GV50 device service
-│       ├── tcp_server.py     # TCP server for GV50
-│       ├── protocol_parser.py # Queclink @Track protocol parser
-│       └── message_handler.py # Message processing logic
+│   ├── models.py             # Data models
+│   ├── tcp_server.py         # TCP server for GV50
+│   ├── protocol_parser.py    # Queclink @Track protocol parser
+│   └── message_handler.py    # Message processing logic
 └── .env                      # Environment configuration
 ```
 
@@ -60,10 +58,11 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 ## Adding New Device Types
 
-1. Create new service folder: `services/new_device/`
-2. Implement device-specific protocol parser
-3. Create TCP server for device protocol
-4. Add message handler for device data
-5. Update main.py to include new service
+1. Create new service folder: `new_device/` (e.g., `gt06/`, `tk103/`)
+2. Copy complete service structure from `gv50/`
+3. Implement device-specific protocol parser
+4. Adapt TCP server for device protocol  
+5. Update message handler for device data format
+6. Update main.py to include new service
 
 The modular architecture ensures easy addition of new GPS tracker device types.

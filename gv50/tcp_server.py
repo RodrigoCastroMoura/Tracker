@@ -1,12 +1,12 @@
 import socket
 import threading
 import time
-from typing import Dict, List
-from common.config import Config
-from common.logger import logger
-from services.gv50.protocol_parser import protocol_parser
-from services.gv50.message_handler import message_handler
-from common.database import db_manager
+from typing import Dict, List, Any
+from gv50.config import Config
+from gv50.logger import logger
+from gv50.protocol_parser import protocol_parser
+from gv50.message_handler import message_handler
+from gv50.database import db_manager
 
 class GV50TCPServer:
     """TCP server for handling GV50 device connections"""
@@ -45,7 +45,7 @@ class GV50TCPServer:
                     
                     logger.info(f"New connection from {client_ip}:{client_address[1]}")
                     
-                    # Handle client in separate thread
+                    # Create thread to handle client
                     client_thread = threading.Thread(
                         target=self.handle_client,
                         args=(client_socket, client_ip),
@@ -54,20 +54,22 @@ class GV50TCPServer:
                     client_thread.start()
                     self.connection_threads.append(client_thread)
                     
-                except socket.error as e:
+                except OSError:
                     if self.running:
-                        logger.error(f"Error accepting connections: {e}")
-                        time.sleep(1)
+                        logger.error("Server socket error occurred")
+                    break
+                except Exception as e:
+                    logger.error(f"Error accepting connection: {e}")
+                    continue
                     
         except Exception as e:
-            logger.error(f"Error starting server: {e}", exc_info=True)
+            logger.error(f"Failed to start TCP server: {e}")
         finally:
-            self.stop_server()
+            self.cleanup_server()
     
     def handle_client(self, client_socket: socket.socket, client_ip: str):
         """Handle individual client connection"""
         connection_id = f"{client_ip}:{client_socket.getpeername()[1]}"
-        self.client_connections[connection_id] = client_socket
         
         try:
             # Set socket timeout
@@ -135,24 +137,21 @@ class GV50TCPServer:
             self.cleanup_client_connection(connection_id, client_socket)
     
     def send_pending_commands(self, client_socket: socket.socket, imei: str, connection_id: str):
-        """Send pending commands to device"""
+        """Send any pending commands to the device"""
         try:
+            # Get pending commands from database
             pending_commands = db_manager.get_pending_commands(imei)
             
-            for command_info in pending_commands:
-                command = command_info.get('command')
-                if command:
-                    try:
-                        client_socket.send(command.encode('utf-8'))
-                        logger.info(f"Sent command to {connection_id} (IMEI: {imei}): {command}")
-                        
-                        # Log outgoing command
-                        message_handler._log_outgoing_message(imei, connection_id.split(':')[0], command)
-                        
-                    except socket.error as e:
-                        logger.error(f"Error sending command to {connection_id}: {e}")
-                        break
-                        
+            for command in pending_commands:
+                try:
+                    command_str = command.get('command', '')
+                    if command_str:
+                        client_socket.send(command_str.encode('utf-8'))
+                        logger.info(f"Sent command to {connection_id}: {command_str}")
+                except socket.error as e:
+                    logger.error(f"Error sending command to {connection_id}: {e}")
+                    break
+                    
         except Exception as e:
             logger.error(f"Error sending pending commands to {connection_id}: {e}")
     
@@ -168,43 +167,47 @@ class GV50TCPServer:
         except Exception as e:
             logger.error(f"Error cleaning up connection {connection_id}: {e}")
     
+    def cleanup_server(self):
+        """Clean up server resources"""
+        try:
+            self.running = False
+            
+            # Close all client connections
+            for connection_id, client_socket in list(self.client_connections.items()):
+                try:
+                    client_socket.close()
+                except:
+                    pass
+            
+            self.client_connections.clear()
+            
+            # Close server socket
+            if self.server_socket:
+                self.server_socket.close()
+                self.server_socket = None
+            
+            logger.info("GV50 TCP Server stopped")
+            
+        except Exception as e:
+            logger.error(f"Error during server cleanup: {e}")
+    
     def stop_server(self):
         """Stop the TCP server"""
         logger.info("Stopping GV50 TCP Server...")
-        self.running = False
-        
-        # Close all client connections
-        for connection_id, client_socket in self.client_connections.copy().items():
-            try:
-                client_socket.close()
-                logger.debug(f"Closed client connection: {connection_id}")
-            except Exception as e:
-                logger.error(f"Error closing client connection {connection_id}: {e}")
-        
-        self.client_connections.clear()
-        
-        # Close server socket
-        if self.server_socket:
-            try:
-                self.server_socket.close()
-                logger.info("Server socket closed")
-            except Exception as e:
-                logger.error(f"Error closing server socket: {e}")
-        
-        # Wait for threads to finish
-        for thread in self.connection_threads:
-            if thread.is_alive():
-                thread.join(timeout=5)
-        
-        logger.info("GV50 TCP Server stopped")
+        self.cleanup_server()
     
     def get_connection_count(self) -> int:
-        """Get current number of active connections"""
+        """Get the number of active connections"""
         return len(self.client_connections)
     
-    def get_connection_info(self) -> Dict[str, str]:
-        """Get information about active connections"""
-        return {conn_id: "active" for conn_id in self.client_connections.keys()}
+    def get_server_status(self) -> Dict[str, Any]:
+        """Get server status information"""
+        return {
+            'running': self.running,
+            'active_connections': len(self.client_connections),
+            'server_ip': Config.SERVER_IP,
+            'server_port': Config.SERVER_PORT
+        }
 
-# Global server instance
+# Global TCP server instance
 tcp_server = GV50TCPServer()

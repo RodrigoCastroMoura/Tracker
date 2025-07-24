@@ -1,1 +1,0 @@
-# GV50 device service package

@@ -10,10 +10,10 @@ import time
 import threading
 from datetime import datetime
 
-from common.config import Config
-from common.logger import logger
-from services.gv50.tcp_server import tcp_server
-from common.database import db_manager
+from gv50.config import Config
+from gv50.logger import logger
+from gv50.tcp_server import tcp_server
+from gv50.database import db_manager
 
 class GV50TrackerService:
     """Main service class for GV50 tracker processing"""

@@ -8,38 +8,25 @@ This is a comprehensive Python-based GPS tracking service designed for multiple 
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (July 23, 2025)
+## Recent Changes (July 24, 2025)
 
-✓ Complete service implementation with MongoDB integration
-✓ Added comprehensive message logging and preservation system  
-✓ Implemented IP change tracking with environment-based control
-✓ Created battery event monitoring and alert system
-✓ Added vehicle commands lookup table structure
-✓ Integrated ignition status tracking and updates
-✓ Environment-based configuration for all logging options
-✓ Complete raw message storage with mensagem_raw field
-✓ Message type identification (+RESP, +BUFF, +ACK)
-✓ TCP server running on port 5000 with concurrent connection support
-✓ Fixed all MongoDB connection issues and method name conflicts
-✓ Corrected TCP server message handling to use proper method names
-✓ Resolved Vehicle model initialization with MongoDB _id field filtering
-✓ Successfully tested with multiple GV50 message types (GTFRI, GTIGN, GTIGF)
-✓ Confirmed data persistence with 7 records stored across both tables
-✓ System fully operational and processing GPS tracking data correctly
-✓ Updated VehicleData model: removed 'course' field, added 'timestamp', 'deviceTimestamp' and 'systemDate' fields
-✓ All field names now follow English standard: timestamp, deviceTimestamp, systemDate (all datetime fields)
-✓ Tested new structure with successful data storage and field validation
-✓ Reorganized codebase: services/gv50/ for device-specific code, common/ for shared utilities
-✓ Changed database name from 'gv50_tracker' to 'tracker' for multi-device support
-✓ Modular architecture ready for additional device types
+✓ Complete reorganization: All GV50 service code moved to dedicated gv50/ folder
+✓ Simplified modular structure: gv50/ contains complete service implementation  
+✓ Database renamed from 'gv50_tracker' to 'tracker' for multi-device support
+✓ Updated imports in main.py to use gv50.* modules
+✓ All service components in single folder: config, logger, models, database, protocol_parser, tcp_server, message_handler
+✓ Environment variable DATABASE_NAME properly set to 'tracker'
+✓ Service successfully running with new structure on port 5000
+✓ MongoDB connection working with unified 'tracker' database
+✓ Architecture ready for additional device types in separate folders
 
 ## System Architecture
 
 The application follows a modular architecture with clear separation of concerns:
 
 ### Backend Architecture
-- **Modular Services**: Device-specific services organized by type (services/gv50/, future: services/other_devices/)
-- **Common Utilities**: Shared components for database, logging, models, and configuration (common/)
+- **Service-Based Organization**: Complete device services in dedicated folders (gv50/, future: gt06/, etc.)
+- **Self-Contained Services**: Each device service contains all required components
 - **TCP Server**: Custom socket-based server for handling persistent connections with GPS devices
 - **Protocol Parser**: Device-specific parsers (currently Queclink @Track for GV50)
 - **Message Handler**: Business logic layer for processing parsed messages and database operations
@@ -55,7 +42,7 @@ The application follows a modular architecture with clear separation of concerns
 
 ## Key Components
 
-### Service Layer (services/gv50/)
+### GV50 Service (gv50/)
 #### TCP Server (`tcp_server.py`)
 - Manages incoming TCP connections from GV50 GPS devices
 - Implements IP whitelisting/blacklisting for security
@@ -74,7 +61,7 @@ The application follows a modular architecture with clear separation of concerns
 - Tracks IP address changes for devices
 - Manages vehicle state updates
 
-### Common Layer (common/)
+### Core Components (gv50/)
 #### Database Manager (`database.py`)
 - Manages MongoDB connections and operations for 'tracker' database
 - Implements data models for vehicles, tracking data, and logs
