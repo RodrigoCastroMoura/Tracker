@@ -11,8 +11,10 @@ class GV50Logger:
         self.setup_logging()
     
     def setup_logging(self):
-        """Setup logging configuration - apenas LOGGING_ENABLED"""
-        if not Config.LOGGING_ENABLED:
+        """Setup logging configuration - sempre ativo"""
+        # Verificar se logs estão desabilitados via variável de ambiente
+        logging_enabled = os.getenv('LOGGING_ENABLED', 'true').lower() == 'true'
+        if not logging_enabled:
             self.logger.disabled = True
             return
         
@@ -50,33 +52,27 @@ class GV50Logger:
     
     def debug(self, message):
         """Debug level logging"""
-        if Config.LOGGING_ENABLED:
-            self.logger.debug(message)
+        self.logger.debug(message)
     
     def info(self, message):
         """Info level logging"""
-        if Config.LOGGING_ENABLED:
-            self.logger.info(message)
+        self.logger.info(message)
     
     def warning(self, message):
         """Warning level logging"""
-        if Config.LOGGING_ENABLED:
-            self.logger.warning(message)
+        self.logger.warning(message)
     
     def error(self, message, exc_info=False):
         """Error level logging"""
-        if Config.LOGGING_ENABLED:
-            self.logger.error(message, exc_info=exc_info)
+        self.logger.error(message, exc_info=exc_info)
     
     def log_database_operation(self, operation: str, table: str, imei: str):
         """Log database operations - simplified"""
-        if Config.LOGGING_ENABLED:
-            self.debug(f"DB {operation} on {table} for IMEI {imei}")
+        self.debug(f"DB {operation} on {table} for IMEI {imei}")
     
     def log_outgoing_message(self, client_ip: str, imei: str, message: str):
         """Log outgoing messages"""
-        if Config.LOGGING_ENABLED:
-            self.info(f"OUTGOING [{client_ip}] IMEI:{imei} - {message}")
+        self.info(f"OUTGOING [{client_ip}] IMEI:{imei} - {message}")
 
 # Global logger instance
 logger = GV50Logger()
