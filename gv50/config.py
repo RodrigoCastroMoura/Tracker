@@ -36,6 +36,10 @@ class Config:
         if not cls.ALLOWED_IPS:
             return True
         
+        # Se contém 0.0.0.0/0, permite todos
+        if '0.0.0.0/0' in cls.ALLOWED_IPS:
+            return True
+        
         # Se há IPs configurados, apenas esses são permitidos
         return ip in cls.ALLOWED_IPS
     
