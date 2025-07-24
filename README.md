@@ -5,8 +5,9 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 ## Project Structure
 
 ```
-├── main.py                    # Main service entry point
+├── .env                       # Environment configuration (root)
 ├── gv50/                      # Complete GV50 service
+│   ├── main.py               # Main service entry point
 │   ├── config.py             # Configuration management
 │   ├── database.py           # MongoDB database manager
 │   ├── logger.py             # Logging system
@@ -14,7 +15,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 │   ├── tcp_server.py         # TCP server for GV50
 │   ├── protocol_parser.py    # Queclink @Track protocol parser
 │   └── message_handler.py    # Message processing logic
-└── .env                      # Environment configuration
+└── logs/                     # Application logs
 ```
 
 ## Features
@@ -67,8 +68,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 3. **Configure environment variables:**
    ```bash
-   cd gv50
-   nano .env  # Edit configuration as needed
+   nano .env  # Edit configuration file in root directory
    ```
 
 4. **Run the service:**
@@ -83,7 +83,7 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
    ```bash
    pip install pymongo python-dotenv
    ```
-3. **Configure the `gv50/.env` file with your settings**
+3. **Configure the `.env` file in root directory with your settings**
 4. **Run the service from the `gv50/` directory**
 
 ## Updates
@@ -117,13 +117,13 @@ A comprehensive Python-based GPS tracking service designed for multiple device t
 
 1. **Backup your configuration:**
    ```bash
-   cp gv50/.env gv50/.env.backup
+   cp .env .env.backup
    ```
 
 2. **Download and extract new version**
 3. **Restore your configuration:**
    ```bash
-   cp gv50/.env.backup gv50/.env
+   cp .env.backup .env
    ```
 4. **Restart the service**
 

@@ -31,6 +31,8 @@ Preferred communication style: Simple, everyday language.
 ✓ Created simplified scripts for auto-restart, backup, and monitoring
 ✓ All scripts adapted for CentOS firewalld, SELinux, and systemd
 ✓ Cleaned up project structure - removed scripts/, systemd/, and manual files per user request
+✓ Simplified configuration: moved .env to root directory instead of gv50/.env
+✓ Updated config.py to load environment variables from root .env file
 
 ## System Architecture
 

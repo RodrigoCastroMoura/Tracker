@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from typing import List, Optional
 
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path="../.env")
 
 class Config:
     """Configuration class for GV50 tracker service"""
@@ -41,6 +41,6 @@ class Config:
     @classmethod
     def reload_config(cls):
         """Reload configuration from environment variables"""
-        load_dotenv(override=True)
+        load_dotenv(dotenv_path="../.env", override=True)
         # Reinitialize class attributes
         cls.__init_subclass__()
