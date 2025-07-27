@@ -230,12 +230,18 @@ class MessageHandler:
             logger.error(f"Error updating vehicle ignition: {e}")
     
     def update_vehicle_blocking(self, imei: str, blocked: bool):
-        """Update vehicle blocking status - new structure with command logic"""
+        """Update vehicle blocking status after ACK confirmation"""
         try:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             
             # Merge with existing data
-            vehicle_data = {'IMEI': imei, 'bloqueado': blocked, 'comandobloqueo': None, 'tsusermanu': datetime.utcnow()}
+            vehicle_data = {
+                'IMEI': imei, 
+                'bloqueado': blocked, 
+                'comandobloqueo': None,  # Clear pending command
+                'tsusermanu': datetime.utcnow()
+            }
+            
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
                     if key not in vehicle_data and value is not None and key != '_id':
@@ -245,7 +251,7 @@ class MessageHandler:
             db_manager.upsert_vehicle(vehicle)
             logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
         except Exception as e:
-            logger.error(f"Error updating vehicle blocking: {e}")
+            logger.error(f"Error updating vehicle blocking status: {e}")
     
     def set_blocking_command(self, imei: str, should_block: bool):
         """Set pending blocking command for vehicle"""

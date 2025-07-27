@@ -349,11 +349,30 @@ class GV50TCPServerCSharpStyle:
                         imei = command_parts[2]
                         status = command_parts[4]
                         
-                        # Update vehicle blocking status like C#
-                        blocked = (status == "0000")
-                        message_handler.update_vehicle_blocking(imei, blocked)
-                        
-                        logger.info(f"Vehicle {imei} {'blocked' if blocked else 'unblocked'}")
+                        # CORREÇÃO: Update vehicle blocking status like C#
+                        # Status "0000" significa sucesso na confirmação
+                        # Precisamos verificar qual comando foi executado (bit 1 ou 0)
+                        if status == "0000":  # Comando executado com sucesso
+                            # Buscar veículo para determinar se foi bloqueio ou desbloqueio
+                            vehicle = db_manager.get_vehicle_by_imei(imei)
+                            if vehicle:
+                                # Se comando era de bloqueio (True), agora está bloqueado
+                                # Se comando era de desbloqueio (False), agora está desbloqueado
+                                if vehicle.get('comandobloqueo') == True:
+                                    blocked = True  # Comando de bloqueio executado
+                                    logger.info(f"Blocking command confirmed for {imei} - Vehicle BLOCKED")
+                                elif vehicle.get('comandobloqueo') == False:
+                                    blocked = False  # Comando de desbloqueio executado
+                                    logger.info(f"Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
+                                else:
+                                    # Comando já foi processado, manter status atual
+                                    blocked = vehicle.get('bloqueado', False)
+                                    logger.info(f"Command already processed for {imei}")
+                                
+                                message_handler.update_vehicle_blocking(imei, blocked)
+                                logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+                        else:
+                            logger.warning(f"Command failed for {imei} with status: {status}")
                     
         except Exception as e:
             logger.error(f"Error processing ACK message: {e}")
@@ -391,9 +410,12 @@ class GV50TCPServerCSharpStyle:
     def execute_immediate_commands(self, client_socket: socket.socket, imei: str):
         """EXECUÇÃO IMEDIATA: Executar comandos pendentes assim que dispositivo conecta"""
         try:
-            # Verificar comando de bloqueio/desbloqueio pendente
+            # Verificar comandos pendentes
             vehicle = db_manager.get_vehicle_by_imei(imei)
             if vehicle:
+                comandos_enviados = []
+                
+                # 1. Verificar comando de bloqueio/desbloqueio pendente
                 comando_pendente = vehicle.get('comandobloqueo')
                 if comando_pendente is not None:  # True ou False, não None
                     # Determinar tipo de comando
@@ -412,8 +434,9 @@ class GV50TCPServerCSharpStyle:
                     
                     # Enviar comando imediatamente via TCP
                     self.send_data(client_socket, comando)
+                    comandos_enviados.append(f"BLOQUEIO: {acao}")
                     
-                    # Limpar comando pendente (será recolocado se necessário)
+                    # Limpar comando pendente
                     vehicle_data = dict(vehicle)
                     if '_id' in vehicle_data:
                         del vehicle_data['_id']
@@ -424,8 +447,35 @@ class GV50TCPServerCSharpStyle:
                     from models import Vehicle
                     updated_vehicle = Vehicle(**vehicle_data)
                     db_manager.upsert_vehicle(updated_vehicle)
+                
+                # 2. Verificar comando de troca de IP pendente
+                comando_ip = vehicle.get('comandotrocarip')
+                if comando_ip == True:
+                    # Comando de troca de IP para GV50
+                    # Formato baseado no manual: AT+GTIPSET=gv50,<ip>,<port>,,,,,,0,,,,,,,FFFF$
+                    comando_ip_cmd = "AT+GTIPSET=gv50,177.94.51.99,8000,,,,,,0,,,,,,,FFFF$"
                     
-                    logger.info(f"✅ Comando {acao} executado imediatamente para {imei}")
+                    logger.warning(f"⚡ EXECUÇÃO IMEDIATA: TROCA DE IP para {imei}")
+                    logger.warning(f"⚡ COMANDO IP ENVIADO IMEDIATAMENTE: {comando_ip_cmd}")
+                    
+                    # Enviar comando de IP imediatamente
+                    self.send_data(client_socket, comando_ip_cmd)
+                    comandos_enviados.append("TROCA DE IP")
+                    
+                    # Limpar comando pendente
+                    vehicle_data = dict(vehicle)
+                    if '_id' in vehicle_data:
+                        del vehicle_data['_id']
+                    vehicle_data['comandotrocarip'] = False
+                    from datetime import datetime
+                    vehicle_data['tsusermanu'] = datetime.utcnow()
+                    
+                    from models import Vehicle
+                    updated_vehicle = Vehicle(**vehicle_data)
+                    db_manager.upsert_vehicle(updated_vehicle)
+                
+                if comandos_enviados:
+                    logger.info(f"✅ Comandos executados imediatamente para {imei}: {', '.join(comandos_enviados)}")
                 else:
                     logger.info(f"ℹ️  Nenhum comando pendente para {imei}")
             else:
