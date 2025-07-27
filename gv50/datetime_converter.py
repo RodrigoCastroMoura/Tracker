@@ -22,13 +22,17 @@ def convert_device_timestamp(device_timestamp: str) -> Optional[datetime]:
         datetime object ou None se conversão falhar
     """
     try:
-        if not device_timestamp or len(device_timestamp) < 14:
+        if not device_timestamp or len(device_timestamp) < 4:
             return None
             
-        # Extrair componentes da data/hora
+        # Extrair e limpar timestamp
         timestamp_clean = device_timestamp.strip()
         
-        # Verificar se tem pelo menos 14 dígitos
+        # GTSTT pode ter timestamp "0000" - tratar como inválido
+        if timestamp_clean == "0000" or timestamp_clean == "":
+            return None
+            
+        # Verificar se tem pelo menos 14 dígitos para timestamp completo
         if len(timestamp_clean) < 14:
             return None
             

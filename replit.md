@@ -84,10 +84,10 @@ Preferred communication style: Simple, everyday language.
 ✓ Removed deviceDateConverted field: deviceTimestamp now directly stores datetime object  
 ✓ Conversion working: "20250727135436" → 2025-07-27 13:54:36 (datetime type)
 ✓ Clean database structure: Only necessary fields stored, no redundant timestamp columns
-✓ Implemented automatic IP change configuration: Uses NEW_DEVICE_IP and NEW_DEVICE_PORT from environment
-✓ IP change command format: AT+GTIPSET=gv50,{NEW_DEVICE_IP},{NEW_DEVICE_PORT},,,,,,0,,,,,,,FFFF$
-✓ Automatic IP change execution: Set comandotrocarip=True in vehicles table to trigger command
-✓ Command resets after execution: comandotrocarip automatically set to False after sending command
+✓ CORREÇÃO CRÍTICA: Comando GTIPSET não existe no protocolo GV50 original
+✓ Analisado código C# original: apenas comando GTOUT (bloqueio/desbloqueio) é suportado
+✓ Sistema corrigido: comandos de troca de IP são automaticamente rejeitados e limpos
+✓ Timestamp "0000" em GTSTT agora tratado corretamente como None (sem erro de conversão)
 
 ## System Architecture
 
