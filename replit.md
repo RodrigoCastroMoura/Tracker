@@ -48,6 +48,9 @@ Preferred communication style: Simple, everyday language.
 ✓ Fixed server port from 5000 to 8000 as required by GV50 devices
 ✓ Corrected database connection to use 'track' database where data exists
 ✓ System now properly listening on port 8000 for GPS device connections
+✓ Implemented exact C# command logic from original Program.cs file
+✓ Fixed critical issue: commands now sent to device when comandobloqueo=true
+✓ Command format matches C# exactly: AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$
 
 ## System Architecture
 

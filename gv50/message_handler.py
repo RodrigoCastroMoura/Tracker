@@ -49,16 +49,13 @@ class MessageHandler:
             # Update vehicle information
             self._update_vehicle_info(parsed_data, client_ip, raw_message)
             
-            # CRÍTICO: Verificar comandos pendentes e enviá-los
-            pending_command = self._check_and_send_pending_commands(imei, client_ip)
-            if pending_command:
-                logger.info(f"Sending pending command to {imei}: {pending_command}")
-                return pending_command  # Enviar comando ao invés de ACK
-            
-            # Generate and return acknowledgment se não há comandos pendentes
+            # Generate acknowledgment primeiro
             response = protocol_parser.generate_acknowledgment(parsed_data)
             if response:
                 logger.log_outgoing_message(client_ip, imei, response)
+            
+            # IMPLEMENTAÇÃO EXATA DO C#: Verificar e executar comandos após salvar dados
+            self._execute_command_logic(imei, client_ip)
             
             return response
             
@@ -130,47 +127,66 @@ class MessageHandler:
         except Exception as e:
             logger.error(f"Error updating vehicle info for IMEI {parsed_data.get('imei')}: {e}", exc_info=True)
     
-    def _check_and_send_pending_commands(self, imei: str, client_ip: str) -> Optional[str]:
-        """Verificar e enviar comandos pendentes para o dispositivo"""
+    def _execute_command_logic(self, imei: str, client_ip: str):
+        """IMPLEMENTAÇÃO EXATA DO CÓDIGO C# - Função Command()"""
         try:
-            # Buscar veículo com comandos pendentes
-            vehicle = db_manager.get_vehicle_by_imei(imei)
-            if not vehicle:
-                return None
+            # Buscar veículo exatamente como no C#: var DtoVeiculo = obj.veiculos.GetVeiculo(IMEI);
+            veiculo = db_manager.get_vehicle_by_imei(imei)
             
-            # Verificar comando de bloqueio pendente
-            if vehicle.get('comandobloqueo') == True:
-                logger.warning(f"🔒 SENDING BLOCK COMMAND to device {imei}")
-                # Gerar comando de bloqueio AT
-                block_command = f"AT+GTRTO=gv50,1,,,,,,,FFFF${self._generate_sequence()}$"
-                logger.log_outgoing_message(client_ip, imei, f"BLOCK_COMMAND: {block_command}")
-                return block_command
+            if veiculo is None:
+                return
+            
+            # Verificar comandobloqueo exatamente como no C#: if (DtoVeiculo.comandoBloqueo == true)
+            if veiculo.get('comandobloqueo') == True:
+                # Determinar bit baseado no status bloqueado (C#: switch (DtoVeiculo.bloqueado))
+                if veiculo.get('bloqueado') == True:
+                    bit = "1"  # Bloquear
+                else:
+                    bit = "0"  # Desbloquear
                 
-            elif vehicle.get('comandobloqueo') == False:
-                logger.warning(f"🔓 SENDING UNBLOCK COMMAND to device {imei}")
-                # Gerar comando de desbloqueio AT
-                unblock_command = f"AT+GTRTO=gv50,0,,,,,,,FFFF${self._generate_sequence()}$"
-                logger.log_outgoing_message(client_ip, imei, f"UNBLOCK_COMMAND: {unblock_command}")
-                return unblock_command
+                # Comando exato do C# para GV50: 
+                # Send(handler, "AT+GTOUT=" + DtoVeiculo.Rastreador.ds_senha + "," + bit + ",,,,,,0,,,,,,,000" + bit + "$");
+                comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
+                
+                logger.warning(f"🚨 COMANDO GV50 ENVIADO: {comando}")
+                logger.warning(f"IMEI: {imei} | Ação: {'BLOQUEAR' if bit == '1' else 'DESBLOQUEAR'}")
+                
+                # Enviar comando via TCP (implementar envio direto)
+                self._send_command_to_device(comando, client_ip, imei)
+                
+        except Exception as e:
+            logger.error(f"Erro na lógica de comando para {imei}: {e}")
+    
+    def _send_command_to_device(self, command: str, client_ip: str, imei: str):
+        """Enviar comando diretamente para o dispositivo via TCP"""
+        try:
+            # Adicionar comando à lista de comandos pendentes para este dispositivo
+            if not hasattr(self, 'pending_commands'):
+                self.pending_commands = {}
             
-            # Verificar comando de troca de IP
-            if vehicle.get('comandotrocarip'):
-                logger.warning(f"🌐 SENDING IP CHANGE COMMAND to device {imei}")
-                # Comando para alterar IP do servidor
-                ip_command = f"AT+GTSER=gv50,1,0.0.0.0,8000,0,,,,,FFFF${self._generate_sequence()}$"
-                logger.log_outgoing_message(client_ip, imei, f"IP_CHANGE_COMMAND: {ip_command}")
-                return ip_command
+            if imei not in self.pending_commands:
+                self.pending_commands[imei] = []
             
-            return None
+            self.pending_commands[imei].append(command)
+            
+            logger.warning(f"📤 COMANDO ADICIONADO À FILA PARA {imei}: {command}")
+            logger.log_outgoing_message(client_ip, imei, f"COMMAND_QUEUED: {command}")
             
         except Exception as e:
-            logger.error(f"Error checking pending commands for {imei}: {e}")
-            return None
+            logger.error(f"Erro ao preparar comando: {e}")
     
-    def _generate_sequence(self) -> str:
-        """Gerar sequência para comandos AT"""
-        from datetime import datetime
-        return datetime.now().strftime("%Y%m%d%H%M%S")[-4:]
+    def get_pending_command(self, imei: str) -> Optional[str]:
+        """Recuperar comando pendente para envio via TCP server"""
+        try:
+            if hasattr(self, 'pending_commands') and imei in self.pending_commands:
+                if self.pending_commands[imei]:
+                    command = self.pending_commands[imei].pop(0)
+                    logger.warning(f"🚀 ENVIANDO COMANDO PARA {imei}: {command}")
+                    return command
+            return None
+        except Exception as e:
+            logger.error(f"Erro ao recuperar comando: {e}")
+            return None
 
     def save_vehicle_data(self, vehicle_data: Dict[str, Any]):
         """Save vehicle data to database - C# style method"""

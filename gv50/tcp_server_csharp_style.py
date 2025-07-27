@@ -96,7 +96,14 @@ class GV50TCPServerCSharpStyle:
                         break
                     
                     # Process received data - equivalent to C# ReadCallback
-                    self.read_callback(client_socket, data, client_ip)
+                    response = self.read_callback(client_socket, data, client_ip)
+                    
+                    # Send response (ACK or command)
+                    if response:
+                        self.send_data(client_socket, response)
+                    
+                    # Check for pending commands and send them (C# Command logic)
+                    self.check_and_send_pending_commands(client_socket, client_ip)
                     
                     # Send heartbeat/keep-alive if needed
                     self.send_heartbeat_if_needed(client_socket, client_ip)
