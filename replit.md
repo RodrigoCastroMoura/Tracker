@@ -98,6 +98,11 @@ Preferred communication style: Simple, everyday language.
 ✓ Formato correto: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
 ✓ Valores padrão configurados: servidor principal e backup usando mesmo IP/porta
 ✓ Sistema dual operacional: GTSRI (troca IP) + GTOUT (bloqueio) funcionando simultaneamente
+✓ SISTEMA COMPLETAMENTE LIMPO E SIMPLIFICADO: Sem hardcode, logs limpos, foco nas 2 tabelas
+✓ Configuração total via .env: Todas as variáveis movidas para arquivo de ambiente
+✓ Logs minimalistas: Apenas nível ERROR para operação limpa
+✓ Arquitetura simplificada: vehicle_data (salvar dados) + vehicles (ler comandos/status)
+✓ Message handler otimizado: Foco apenas em salvar GPS e atualizar ignição
 
 ## System Architecture
 
