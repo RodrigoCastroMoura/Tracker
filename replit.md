@@ -100,9 +100,10 @@ Preferred communication style: Simple, everyday language.
 ✓ Sistema dual operacional: GTSRI (troca IP) + GTOUT (bloqueio) funcionando simultaneamente
 ✓ SISTEMA COMPLETAMENTE LIMPO E SIMPLIFICADO: Sem hardcode, logs limpos, foco nas 2 tabelas
 ✓ Configuração total via .env: Todas as variáveis movidas para arquivo de ambiente
-✓ Logs minimalistas: Apenas nível ERROR para operação limpa
+✓ Logs categóricos restaurados: DEBUG, INFO, WARNING, ERROR, PROTOCOL controlados via .env
 ✓ Arquitetura simplificada: vehicle_data (salvar dados) + vehicles (ler comandos/status)
-✓ Message handler otimizado: Foco apenas em salvar GPS e atualizar ignição
+✓ Message handler corrigido: Métodos save_vehicle_data e update_vehicle funcionais
+✓ Sistema testado e operacional: Comandos GTOUT + GTSRI executando corretamente
 
 ## System Architecture
 

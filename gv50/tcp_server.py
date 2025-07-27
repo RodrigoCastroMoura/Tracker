@@ -223,9 +223,6 @@ class GV50TCPServerCSharpStyle:
                         logger.info(f"DEBUG: Processing GPS message with device_timestamp: {vehicle_data.get('device_timestamp', 'N/A')}")
                         response = message_handler.handle_incoming_message(raw_message, client_ip)
                         
-                        # Save vehicle data with conversion - GTFRI specific
-                        message_handler.save_vehicle_data(vehicle_data)
-                        
                         # Send ACK response
                         if response:
                             self.send_data(client_socket, response)
