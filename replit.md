@@ -67,6 +67,11 @@ Preferred communication style: Simple, everyday language.
 ✓ Fixed critical command execution issue: Commands now executed on EVERY message, not just first connection
 ✓ Supports permanent device connections: Works correctly with devices that stay connected continuously
 ✓ Command verification on all message types: RESP, BUFF, GTFRI, GTIGN, GTSTT all trigger command checking
+✓ Fixed ACK status "0001" processing: Status codes 0001-0003 now treated as successful command execution
+✓ Added heartbeat command execution: Commands now sent during GTHBD heartbeat messages for better reliability
+✓ Implemented device timestamp conversion: Created datetime_converter.py for proper timestamp handling
+✓ Enhanced blocking/unblocking system: Commands processed correctly with immediate status updates after ACK
+✓ Updated models with deviceDateConverted field: Vehicle data now stores both original and converted timestamps
 
 ## System Architecture
 

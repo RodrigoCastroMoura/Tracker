@@ -203,6 +203,7 @@ class GV50TCPServerCSharpStyle:
                         
                         # Process through message_handler (includes command logic)
                         raw_message = '+RESP:' + ','.join(command_parts)
+                        logger.info(f"DEBUG: Processing GPS message with device_timestamp: {command_parts[13] if len(command_parts) > 13 else 'N/A'}")
                         response = message_handler.handle_incoming_message(raw_message, client_ip)
                         
                         # Send ACK response
@@ -239,7 +240,8 @@ class GV50TCPServerCSharpStyle:
                             'raw_message': '+RESP:' + ','.join(command_parts)
                         }
                         
-                        # Save to database
+                        # Save to database  
+                        logger.info(f"DEBUG: Saving ignition data with device_timestamp: {command_parts[11] if len(command_parts) > 11 else 'N/A'}")
                         message_handler.save_vehicle_data(vehicle_data)
                         
                         # Update ignition status
@@ -339,11 +341,10 @@ class GV50TCPServerCSharpStyle:
             if len(command_parts) > 0:
                 command_type = command_parts[0]
                 
-                # FILTRAR HEARTBEATS - não processar GTHBD como nova conexão
+                # HEARTBEAT - processar e enviar comandos pendentes
                 if command_type == "GTHBD":
                     if len(command_parts) > 2:
                         imei = command_parts[2]
-                        # Apenas registrar heartbeat no log, não como nova conexão
                         logger.debug(f"Heartbeat received from IMEI {imei} at {client_ip}")
                         
                         # Verificar se dispositivo já está registrado
@@ -353,6 +354,10 @@ class GV50TCPServerCSharpStyle:
                             # Primeira vez que vemos este IMEI - registrar conexão
                             self.connected_devices[imei] = client_ip
                             logger.info(f"New device connected: IMEI {imei} from {client_ip}")
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes NO HEARTBEAT
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (heartbeat)")
+                        self.execute_immediate_commands(client_socket, imei)
                     return  # Não processar heartbeat como mensagem normal
                 
                 elif command_type == "GTOUT":
@@ -383,7 +388,28 @@ class GV50TCPServerCSharpStyle:
                                 message_handler.update_vehicle_blocking(imei, blocked)
                                 logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
                         else:
-                            logger.warning(f"Command failed for {imei} with status: {status}")
+                            # CORREÇÃO: Status "0001" pode ser sucesso em alguns casos
+                            # Verificar baseado no protocolo Queclink
+                            if status in ["0001", "0002", "0003"]:
+                                logger.info(f"Command executed for {imei} with status: {status}")
+                                # Processar como sucesso mas verificar tipo do comando
+                                vehicle = db_manager.get_vehicle_by_imei(imei)
+                                logger.info(f"DEBUG: Vehicle data for {imei}: comandobloqueo={vehicle.get('comandobloqueo') if vehicle else 'N/A'}")
+                                
+                                if vehicle and vehicle.get('comandobloqueo') is not None:
+                                    if vehicle.get('comandobloqueo') == True:
+                                        blocked = True  # Comando de bloqueio executado
+                                        logger.info(f"Blocking command confirmed for {imei} - Vehicle BLOCKED (status: {status})")
+                                    else:
+                                        blocked = False  # Comando de desbloqueio executado
+                                        logger.info(f"Unblocking command confirmed for {imei} - Vehicle UNBLOCKED (status: {status})")
+                                    
+                                    message_handler.update_vehicle_blocking(imei, blocked)
+                                    logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+                                else:
+                                    logger.warning(f"No pending command found for {imei} when processing status {status}")
+                            else:
+                                logger.warning(f"Command failed for {imei} with status: {status}")
                     
         except Exception as e:
             logger.error(f"Error processing ACK message: {e}")
@@ -447,17 +473,9 @@ class GV50TCPServerCSharpStyle:
                     self.send_data(client_socket, comando)
                     comandos_enviados.append(f"BLOQUEIO: {acao}")
                     
-                    # Limpar comando pendente
-                    vehicle_data = dict(vehicle)
-                    if '_id' in vehicle_data:
-                        del vehicle_data['_id']
-                    vehicle_data['comandobloqueo'] = None
-                    from datetime import datetime
-                    vehicle_data['tsusermanu'] = datetime.utcnow()
-                    
-                    from models import Vehicle
-                    updated_vehicle = Vehicle(**vehicle_data)
-                    db_manager.upsert_vehicle(updated_vehicle)
+                    # NÃO limpar comando pendente aqui - será limpo após processar ACK
+                    # A limpeza acontece no update_vehicle_blocking para garantir que
+                    # o ACK seja processado corretamente
                 
                 # 2. Verificar comando de troca de IP pendente
                 comando_ip = vehicle.get('comandotrocarip')

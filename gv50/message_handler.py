@@ -4,6 +4,7 @@ from database import db_manager
 from protocol_parser import protocol_parser
 from logger import logger
 from models import VehicleData, Vehicle
+from datetime_converter import convert_device_timestamp
 
 class MessageHandler:
     """Handle parsed messages and update database - apenas duas tabelas"""
@@ -195,15 +196,26 @@ class MessageHandler:
             # Convert dict to VehicleData object
             current_time = datetime.utcnow()
             
+            # Converter data do dispositivo
+            device_timestamp_str = vehicle_data.get('device_timestamp', '')
+            device_datetime_converted = convert_device_timestamp(device_timestamp_str)
+            
             vehicle_record = VehicleData(
                 imei=vehicle_data.get('imei', ''),
                 longitude=vehicle_data.get('longitude', '0'),
                 latitude=vehicle_data.get('latitude', '0'),
                 altitude=vehicle_data.get('altitude', '0'),
                 timestamp=current_time,  # Data do servidor
-                deviceTimestamp=vehicle_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+                deviceTimestamp=device_timestamp_str,  # Data do dispositivo original
+                deviceDateConverted=device_datetime_converted,  # Data do dispositivo convertida
                 mensagem_raw=vehicle_data.get('raw_message', '')
             )
+            
+            # Log da conversão para debug
+            if device_datetime_converted:
+                logger.info(f"✅ Device timestamp converted: {device_timestamp_str} -> {device_datetime_converted}")
+            else:
+                logger.warning(f"❌ Failed to convert device timestamp: {device_timestamp_str}")
             
             db_manager.insert_vehicle_data(vehicle_record)
             logger.debug(f"Saved vehicle data for IMEI: {vehicle_data.get('imei')}")

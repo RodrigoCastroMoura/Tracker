@@ -113,6 +113,9 @@ class QueclinkProtocolParser:
             # Convert numeric fields
             self._convert_numeric_fields(data)
             
+            # Add raw message for storage
+            data['raw_message'] = message
+            
             logger.debug(f"Successfully parsed GTFRI message for IMEI: {data.get('imei', 'unknown')}")
             return data
             
@@ -155,6 +158,10 @@ class QueclinkProtocolParser:
             }
             
             self._convert_numeric_fields(data)
+            
+            # Add raw message for storage
+            data['raw_message'] = message
+            
             return data
             
         except Exception as e:
@@ -196,6 +203,10 @@ class QueclinkProtocolParser:
             }
             
             self._convert_numeric_fields(data)
+            
+            # Add raw message for storage
+            data['raw_message'] = message
+            
             return data
             
         except Exception as e:
