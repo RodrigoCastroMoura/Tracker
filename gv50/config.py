@@ -29,6 +29,10 @@ class Config:
     CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '3600'))  # 1 hour for long-connection
     MAX_CONNECTIONS: int = int(os.getenv('MAX_CONNECTIONS', '100'))
     
+    # IP Change Configuration - para comando AT+GTIPSET
+    NEW_DEVICE_IP: str = os.getenv('NEW_DEVICE_IP', '177.94.51.99')  # IP padrão para troca
+    NEW_DEVICE_PORT: int = int(os.getenv('NEW_DEVICE_PORT', '8000'))  # Porta padrão para troca
+    
     @classmethod
     def is_ip_allowed(cls, ip: str) -> bool:
         """Check if IP address is allowed to connect - apenas lista de IPs permitidos"""

@@ -500,9 +500,10 @@ class GV50TCPServerCSharpStyle:
                 # 2. Verificar comando de troca de IP pendente
                 comando_ip = vehicle.get('comandotrocarip')
                 if comando_ip == True:
-                    # Comando de troca de IP para GV50
+                    # Comando de troca de IP para GV50 usando configuração do .env
                     # Formato baseado no manual: AT+GTIPSET=gv50,<ip>,<port>,,,,,,0,,,,,,,FFFF$
-                    comando_ip_cmd = "AT+GTIPSET=gv50,177.94.51.99,8000,,,,,,0,,,,,,,FFFF$"
+                    from config import Config
+                    comando_ip_cmd = f"AT+GTIPSET=gv50,{Config.NEW_DEVICE_IP},{Config.NEW_DEVICE_PORT},,,,,,0,,,,,,,FFFF$"
                     
                     logger.warning(f"⚡ EXECUÇÃO IMEDIATA: TROCA DE IP para {imei}")
                     logger.warning(f"⚡ COMANDO IP ENVIADO IMEDIATAMENTE: {comando_ip_cmd}")
