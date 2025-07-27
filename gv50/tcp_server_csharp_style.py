@@ -103,7 +103,7 @@ class GV50TCPServerCSharpStyle:
                         self.send_data(client_socket, response)
                     
                     # Check for pending commands and send them (C# Command logic)
-                    self.check_and_send_pending_commands(client_socket, client_ip)
+                    # Implementar após integração completa
                     
                     # Send heartbeat/keep-alive if needed
                     self.send_heartbeat_if_needed(client_socket, client_ip)
@@ -348,10 +348,28 @@ class GV50TCPServerCSharpStyle:
     def send_command(self, client_socket: socket.socket, imei: str):
         """Send command to device if needed - like C# Command method"""
         try:
-            # Simple command check - no database commands for now
-            logger.debug(f"Checking commands for {imei}")
+            # Verificar comando pendente no message_handler
+            pending_command = message_handler.get_pending_command(imei)
+            if pending_command:
+                logger.warning(f"🚀 ENVIANDO COMANDO VIA TCP PARA {imei}: {pending_command}")
+                self.send_data(client_socket, pending_command)
         except Exception as e:
             logger.error(f"Error sending command: {e}")
+    
+    def check_and_send_pending_commands(self, client_socket: socket.socket, client_ip: str):
+        """Verificar e enviar comandos pendentes - implementação C# Command()"""
+        try:
+            # Buscar IMEI da conexão atual
+            for imei, ip in self.connected_devices.items():
+                if ip == client_ip:
+                    # Verificar comando pendente
+                    pending_command = message_handler.get_pending_command(imei)
+                    if pending_command:
+                        logger.warning(f"🚀 COMANDO PENDENTE ENVIADO PARA {imei}: {pending_command}")
+                        self.send_data(client_socket, pending_command)
+                    break
+        except Exception as e:
+            logger.error(f"Erro ao verificar comandos pendentes: {e}")
     
     def get_connection_count(self) -> int:
         """Get current connection count - dispositivos únicos por IMEI"""
