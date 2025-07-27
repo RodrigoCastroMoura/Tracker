@@ -12,7 +12,7 @@ class VehicleData:
     timestamp: Optional[datetime] = None  # Data do servidor
     deviceTimestamp: str = ""  # Data do dispositivo apenas para referência
     mensagem_raw: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for MongoDB insertion"""
         return asdict(self)
@@ -32,8 +32,11 @@ class Vehicle:
     bateriavoltagem: Optional[float] = None  # Voltagem atual da bateria
     bateriabaixa: Optional[bool] = False  # True se bateria estiver baixa
     ultimoalertabateria: Optional[datetime] = None  # Timestamp do último alerta
+    motion_status: Optional[str] = None  # Status de movimento do GTSTT
+    motion_description: Optional[str] = None  # Descrição do movimento
+    is_moving: Optional[bool] = None  # Se está em movimento
     tsusermanu: Optional[datetime] = None  # Última atualização manual
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for MongoDB operations"""
         data = asdict(self)

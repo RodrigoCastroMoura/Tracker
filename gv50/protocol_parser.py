@@ -12,7 +12,8 @@ class QueclinkProtocolParser:
             'GTFRI': r'\+(?P<msg_type>RESP|BUFF|ACK):GTFRI,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>[^$]*)\$',
             'GTIGN': r'\+(?P<msg_type>RESP|BUFF|ACK):GTIGN,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<report_id>[^,]*),(?P<report_type>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$',
             'GTIGF': r'\+(?P<msg_type>RESP|BUFF|ACK):GTIGF,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<report_id>[^,]*),(?P<report_type>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$',
-            'GTOUT': r'\+(?P<msg_type>RESP|BUFF|ACK):GTOUT,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<report_id>[^,]*),(?P<report_type>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$'
+            'GTOUT': r'\+(?P<msg_type>RESP|BUFF|ACK):GTOUT,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<report_id>[^,]*),(?P<report_type>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$',
+            'GTSTT': r'\+(?P<msg_type>RESP|BUFF|ACK):GTSTT,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<motion_status>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$'
         }
     
     def parse_message(self, message: str) -> Dict[str, str]:
@@ -36,6 +37,8 @@ class QueclinkProtocolParser:
                 return self._parse_gtigf(message)
             elif message_type == 'GTOUT':
                 return self._parse_gtout(message)
+            elif message_type == 'GTSTT':
+                return self._parse_gtstt(message)
             
             # Fallback to regex patterns for unknown types
             pattern = self.message_patterns.get(message_type)
@@ -231,6 +234,68 @@ class QueclinkProtocolParser:
         except Exception as e:
             logger.error(f"Error parsing GTOUT: {e}")
             return {'error': f'GTOUT parse error: {str(e)}'}
+    
+    def _parse_gtstt(self, message: str) -> Dict[str, str]:
+        """Parse GTSTT message - mudanças de estado do dispositivo"""
+        try:
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid message structure'}
+            
+            msg_type = msg_parts[0]
+            data_part = msg_parts[1]
+            fields = data_part.split(',')
+            
+            if len(fields) < 13:
+                return {'error': f'Insufficient fields in GTSTT: {len(fields)}'}
+            
+            # Map fields for GTSTT message
+            # GTSTT: mudança de estado do movimento do dispositivo
+            motion_status = fields[4] if len(fields) > 4 else ''
+            
+            # Interpretar estado do movimento:
+            # 11 = Start Moving  
+            # 12 = Stop Moving
+            # 21 = Start Moving (by Vibration)
+            # 22 = Stop Moving (by Vibration)
+            # 41 = Sensor Rest (sensor em repouso)
+            # 42 = Sensor Motion (sensor em movimento)
+            
+            motion_description = {
+                '11': 'Start Moving',
+                '12': 'Stop Moving', 
+                '21': 'Start Moving (Vibration)',
+                '22': 'Stop Moving (Vibration)',
+                '41': 'Sensor Rest',
+                '42': 'Sensor Motion'
+            }.get(motion_status, f'Unknown Status ({motion_status})')
+            
+            data = {
+                'msg_type': msg_type,
+                'report_type': 'GTSTT',
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',
+                'device_name': fields[3] if len(fields) > 3 else '',
+                'motion_status': motion_status,
+                'motion_description': motion_description,
+                'is_moving': motion_status in ['11', '21', '42'],  # Estados de movimento
+                'speed': fields[7] if len(fields) > 7 else '0',
+                'course': fields[8] if len(fields) > 8 else '0', 
+                'altitude': fields[9] if len(fields) > 9 else '0',
+                'longitude': fields[10] if len(fields) > 10 else '0',
+                'latitude': fields[11] if len(fields) > 11 else '0',
+                'device_timestamp': fields[12] if len(fields) > 12 else '',
+                'count': fields[-1] if len(fields) > 19 else '0'
+            }
+            
+            self._convert_numeric_fields(data)
+            logger.info(f"GTSTT parsed for IMEI {data['imei']}: {motion_description}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTSTT: {e}")
+            return {'error': f'GTSTT parse error: {str(e)}'}
     
     def _convert_numeric_fields(self, data: Dict[str, str]):
         """Convert numeric fields to proper format"""

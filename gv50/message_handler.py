@@ -217,6 +217,45 @@ class MessageHandler:
             logger.info(f"Set IP change command for {imei}")
         except Exception as e:
             logger.error(f"Error setting IP change command: {e}")
+    
+    def update_vehicle_motion_status(self, imei: str, motion_status: str):
+        """Update vehicle motion status based on GTSTT message"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Interpretar estado do movimento
+            motion_descriptions = {
+                '11': 'Start Moving',
+                '12': 'Stop Moving', 
+                '21': 'Start Moving (Vibration)',
+                '22': 'Stop Moving (Vibration)',
+                '41': 'Sensor Rest',
+                '42': 'Sensor Motion'
+            }
+            
+            motion_description = motion_descriptions.get(motion_status, f'Unknown Status ({motion_status})')
+            is_moving = motion_status in ['11', '21', '42']
+            
+            # Merge with existing data
+            vehicle_data = {
+                'IMEI': imei, 
+                'motion_status': motion_status,
+                'motion_description': motion_description,
+                'is_moving': is_moving,
+                'tsusermanu': datetime.utcnow()
+            }
+            
+            if existing_vehicle:
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Updated motion status for {imei}: {motion_description} (status: {motion_status})")
+            
+        except Exception as e:
+            logger.error(f"Error updating vehicle motion status: {e}")
 
 # Global message handler instance
 message_handler = MessageHandler()
