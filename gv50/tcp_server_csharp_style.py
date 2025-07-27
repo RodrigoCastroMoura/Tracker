@@ -189,21 +189,38 @@ class GV50TCPServerCSharpStyle:
                         logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
                         self.execute_immediate_commands(client_socket, imei)
                         
-                        # Map fields exactly like C#
-                        vehicle_data = {
-                            'imei': imei,
-                            'speed': command_parts[8],
-                            'altitude': command_parts[10],
-                            'longitude': command_parts[11],
-                            'latitude': command_parts[12],
-                            'device_timestamp': command_parts[13],
-                            'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                            'raw_message': '+RESP:' + ','.join(command_parts)
-                        }
+                        # Use protocol_parser for correct field mapping
+                        from protocol_parser import protocol_parser
+                        raw_message = '+RESP:' + ','.join(command_parts)
+                        parsed_data = protocol_parser.parse_message(raw_message)
+                        
+                        if parsed_data and not parsed_data.get('error'):
+                            vehicle_data = {
+                                'imei': parsed_data.get('imei', imei),
+                                'speed': parsed_data.get('speed', '0'),
+                                'altitude': parsed_data.get('altitude', '0'),
+                                'longitude': parsed_data.get('longitude', '0'),
+                                'latitude': parsed_data.get('latitude', '0'),
+                                'device_timestamp': parsed_data.get('device_timestamp', ''),
+                                'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                                'raw_message': raw_message
+                            }
+                            logger.info(f"✅ Parsed device timestamp: {parsed_data.get('device_timestamp', 'N/A')}")
+                        else:
+                            # Fallback to old mapping if parser fails
+                            vehicle_data = {
+                                'imei': imei,
+                                'speed': command_parts[8],
+                                'altitude': command_parts[10],
+                                'longitude': command_parts[11],
+                                'latitude': command_parts[12],
+                                'device_timestamp': command_parts[13],
+                                'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                                'raw_message': raw_message
+                            }
                         
                         # Process through message_handler (includes command logic)
-                        raw_message = '+RESP:' + ','.join(command_parts)
-                        logger.info(f"DEBUG: Processing GPS message with device_timestamp: {command_parts[13] if len(command_parts) > 13 else 'N/A'}")
+                        logger.info(f"DEBUG: Processing GPS message with device_timestamp: {vehicle_data.get('device_timestamp', 'N/A')}")
                         response = message_handler.handle_incoming_message(raw_message, client_ip)
                         
                         # Send ACK response

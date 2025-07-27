@@ -64,6 +64,21 @@ class QueclinkProtocolParser:
             logger.error(f"Error parsing message: {e}")
             return {'error': f'Parse error: {str(e)}'}
     
+    def _extract_device_timestamp(self, fields: List[str]) -> str:
+        """Extract device timestamp from GTFRI message - it's typically near the end"""
+        try:
+            # For GTFRI, device timestamp is usually at the end before counter
+            # Based on your example: 20250727122605 appears near the end
+            # Let's check the last few fields for a 14-digit timestamp
+            for i in range(len(fields) - 1, max(0, len(fields) - 5), -1):
+                field = fields[i].strip()
+                if len(field) == 14 and field.isdigit():
+                    return field
+            return ''
+        except Exception as e:
+            logger.error(f"Error extracting device timestamp: {e}")
+            return ''
+    
     def _parse_gtfri(self, message: str) -> Dict[str, str]:
         """Parse GTFRI message based on C# implementation"""
         try:
@@ -97,10 +112,11 @@ class QueclinkProtocolParser:
                 'gps_accuracy': fields[5] if len(fields) > 5 else '0',
                 'speed': fields[8] if len(fields) > 8 else '0',  # comando[8] no C# para GTFRI
                 'course': fields[7] if len(fields) > 7 else '0',
-                'altitude': fields[10] if len(fields) > 10 else '0',  # comando[10] no C#
-                'longitude': fields[11] if len(fields) > 11 else '0',  # comando[11] no C#
-                'latitude': fields[12] if len(fields) > 12 else '0',   # comando[12] no C#
-                'device_timestamp': fields[13] if len(fields) > 13 else '',  # comando[13] no C#
+                'altitude': fields[9] if len(fields) > 9 else '0',  # altitude
+                'longitude': fields[10] if len(fields) > 10 else '0',  # longitude  
+                'latitude': fields[11] if len(fields) > 11 else '0',  # latitude
+                'gps_timestamp': fields[12] if len(fields) > 12 else '',  # Data/hora GPS
+                'device_timestamp': self._extract_device_timestamp(fields),  # Data/hora do dispositivo (final)
                 'mcc': fields[14] if len(fields) > 14 else '',
                 'mnc': fields[15] if len(fields) > 15 else '',
                 'lac': fields[16] if len(fields) > 16 else '',

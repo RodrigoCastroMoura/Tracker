@@ -200,6 +200,9 @@ class MessageHandler:
             device_timestamp_str = vehicle_data.get('device_timestamp', '')
             device_datetime_converted = convert_device_timestamp(device_timestamp_str)
             
+            # Debug da conversão
+            logger.info(f"🔄 Converting device timestamp: '{device_timestamp_str}' -> {device_datetime_converted}")
+            
             vehicle_record = VehicleData(
                 imei=vehicle_data.get('imei', ''),
                 longitude=vehicle_data.get('longitude', '0'),
