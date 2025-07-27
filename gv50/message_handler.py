@@ -120,6 +120,15 @@ class MessageHandler:
                     vehicle_data['comandobloqueo'] = None  # Clear pending command
                     logger.info(f"Vehicle blocking command confirmed for IMEI {imei}")
             
+            # Handle IP change commands
+            if parsed_data.get('report_type') == 'GTSRI':
+                # Process IP change command response
+                ip_change_success = parsed_data.get('ip_change_success', False)
+                if ip_change_success:
+                    logger.info(f"IP change command confirmed for IMEI {imei}")
+                else:
+                    logger.warning(f"IP change command failed for IMEI {imei}: status {parsed_data.get('status', 'unknown')}")
+            
             # Merge with existing data if available
             if existing_vehicle:
                 for key, value in existing_vehicle.items():

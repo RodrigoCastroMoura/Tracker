@@ -497,13 +497,22 @@ class GV50TCPServerCSharpStyle:
                     # A limpeza acontece no update_vehicle_blocking para garantir que
                     # o ACK seja processado corretamente
                 
-                # 2. AVISO: Comando de troca de IP não suportado no protocolo GV50
+                # 2. Verificar comando de troca de IP pendente - COMANDO GTSRI
                 comando_ip = vehicle.get('comandotrocarip')
                 if comando_ip == True:
-                    logger.warning(f"❌ COMANDO DE TROCA DE IP NÃO SUPORTADO NO PROTOCOLO GV50 para {imei}")
-                    logger.warning(f"📝 O protocolo GV50 não possui comando GTIPSET - apenas GTOUT (bloqueio/desbloqueio)")
+                    # Comando de troca de IP para GV50 usando GTSRI
+                    # Formato: AT+GTSRI=gv50,1,0,,[novo_ip],[nova_porta],0,,,,,0001$
+                    from config import Config
+                    comando_ip_cmd = f"AT+GTSRI=gv50,1,0,,{Config.NEW_DEVICE_IP},{Config.NEW_DEVICE_PORT},0,,,,,0001$"
                     
-                    # Limpar comando pendente já que não é suportado
+                    logger.warning(f"⚡ EXECUÇÃO IMEDIATA: TROCA DE IP (GTSRI) para {imei}")
+                    logger.warning(f"⚡ COMANDO GTSRI ENVIADO: {comando_ip_cmd}")
+                    
+                    # Enviar comando de IP imediatamente
+                    self.send_data(client_socket, comando_ip_cmd)
+                    comandos_enviados.append("TROCA DE IP (GTSRI)")
+                    
+                    # Limpar comando pendente após envio
                     vehicle_data = dict(vehicle)
                     if '_id' in vehicle_data:
                         del vehicle_data['_id']
@@ -514,8 +523,6 @@ class GV50TCPServerCSharpStyle:
                     from models import Vehicle
                     updated_vehicle = Vehicle(**vehicle_data)
                     db_manager.upsert_vehicle(updated_vehicle)
-                    
-                    comandos_enviados.append("TROCA DE IP (NÃO SUPORTADO - COMANDO LIMPO)")
                 
                 if comandos_enviados:
                     logger.info(f"✅ Comandos executados imediatamente para {imei}: {', '.join(comandos_enviados)}")

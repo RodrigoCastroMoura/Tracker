@@ -88,6 +88,10 @@ Preferred communication style: Simple, everyday language.
 ✓ Analisado código C# original: apenas comando GTOUT (bloqueio/desbloqueio) é suportado
 ✓ Sistema corrigido: comandos de troca de IP são automaticamente rejeitados e limpos
 ✓ Timestamp "0000" em GTSTT agora tratado corretamente como None (sem erro de conversão)
+✓ IMPLEMENTADO: Comando GTSRI para troca de IP conforme especificação do usuário
+✓ Formato GTSRI: AT+GTSRI=gv50,1,0,,[novo_ip],[nova_porta],0,,,,,0001$ usando variáveis do .env
+✓ Parser GTSRI adicionado: processa respostas de confirmação de troca de IP
+✓ Sistema integrado: comando enviado imediatamente quando comandotrocarip=True
 
 ## System Architecture
 
