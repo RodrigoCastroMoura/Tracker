@@ -64,6 +64,9 @@ Preferred communication style: Simple, everyday language.
 ✓ Implemented IP change command: AT+GTIPSET format working with immediate execution
 ✓ Corrected ACK processing logic: System properly identifies command type before status update
 ✓ Both blocking/unblocking and IP change commands fully operational with real-time status updates
+✓ Fixed critical command execution issue: Commands now executed on EVERY message, not just first connection
+✓ Supports permanent device connections: Works correctly with devices that stay connected continuously
+✓ Command verification on all message types: RESP, BUFF, GTFRI, GTIGN, GTSTT all trigger command checking
 
 ## System Architecture
 

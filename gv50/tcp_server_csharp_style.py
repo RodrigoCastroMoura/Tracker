@@ -183,9 +183,11 @@ class GV50TCPServerCSharpStyle:
                         if first_connection:
                             self.connected_devices[imei] = client_ip
                             logger.info(f"New device connected via GTFRI: IMEI {imei} from {client_ip}")
-                            # EXECUÇÃO IMEDIATA: Verificar comandos pendentes na primeira conexão
-                            logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (conexão inicial)")
-                            self.execute_immediate_commands(client_socket, imei)
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
+                        # O dispositivo fica conectado permanentemente, então precisamos verificar sempre
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
+                        self.execute_immediate_commands(client_socket, imei)
                         
                         # Map fields exactly like C#
                         vehicle_data = {
@@ -219,9 +221,10 @@ class GV50TCPServerCSharpStyle:
                         if first_connection:
                             self.connected_devices[imei] = client_ip
                             logger.info(f"New device connected via {command_type}: IMEI {imei} from {client_ip}")
-                            # EXECUÇÃO IMEDIATA: Verificar comandos pendentes na primeira conexão
-                            logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (conexão inicial)")
-                            self.execute_immediate_commands(client_socket, imei)
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
+                        self.execute_immediate_commands(client_socket, imei)
                         
                         # Map fields exactly like C#
                         vehicle_data = {
@@ -254,6 +257,10 @@ class GV50TCPServerCSharpStyle:
                         if imei not in self.connected_devices:
                             self.connected_devices[imei] = client_ip
                             logger.info(f"New device connected via GTSTT: IMEI {imei} from {client_ip}")
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
+                        self.execute_immediate_commands(client_socket, imei)
                         
                         # Map fields para GTSTT
                         vehicle_data = {
@@ -313,6 +320,10 @@ class GV50TCPServerCSharpStyle:
                                     'server_timestamp': device_time,  # Use device time
                                     'raw_message': '+BUFF:' + ','.join(command_parts)
                                 }
+                                
+                                # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM BUFF
+                                logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {vehicle_data['imei']} (mensagem BUFF)")
+                                self.execute_immediate_commands(client_socket, vehicle_data['imei'])
                                 
                                 message_handler.save_vehicle_data(vehicle_data)
                                 self.send_command(client_socket, vehicle_data['imei'])
