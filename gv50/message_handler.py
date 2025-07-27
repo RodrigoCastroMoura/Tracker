@@ -49,7 +49,13 @@ class MessageHandler:
             # Update vehicle information
             self._update_vehicle_info(parsed_data, client_ip, raw_message)
             
-            # Generate and return acknowledgment
+            # CRÍTICO: Verificar comandos pendentes e enviá-los
+            pending_command = self._check_and_send_pending_commands(imei, client_ip)
+            if pending_command:
+                logger.info(f"Sending pending command to {imei}: {pending_command}")
+                return pending_command  # Enviar comando ao invés de ACK
+            
+            # Generate and return acknowledgment se não há comandos pendentes
             response = protocol_parser.generate_acknowledgment(parsed_data)
             if response:
                 logger.log_outgoing_message(client_ip, imei, response)
@@ -123,6 +129,48 @@ class MessageHandler:
             
         except Exception as e:
             logger.error(f"Error updating vehicle info for IMEI {parsed_data.get('imei')}: {e}", exc_info=True)
+    
+    def _check_and_send_pending_commands(self, imei: str, client_ip: str) -> Optional[str]:
+        """Verificar e enviar comandos pendentes para o dispositivo"""
+        try:
+            # Buscar veículo com comandos pendentes
+            vehicle = db_manager.get_vehicle_by_imei(imei)
+            if not vehicle:
+                return None
+            
+            # Verificar comando de bloqueio pendente
+            if vehicle.get('comandobloqueo') == True:
+                logger.warning(f"🔒 SENDING BLOCK COMMAND to device {imei}")
+                # Gerar comando de bloqueio AT
+                block_command = f"AT+GTRTO=gv50,1,,,,,,,FFFF${self._generate_sequence()}$"
+                logger.log_outgoing_message(client_ip, imei, f"BLOCK_COMMAND: {block_command}")
+                return block_command
+                
+            elif vehicle.get('comandobloqueo') == False:
+                logger.warning(f"🔓 SENDING UNBLOCK COMMAND to device {imei}")
+                # Gerar comando de desbloqueio AT
+                unblock_command = f"AT+GTRTO=gv50,0,,,,,,,FFFF${self._generate_sequence()}$"
+                logger.log_outgoing_message(client_ip, imei, f"UNBLOCK_COMMAND: {unblock_command}")
+                return unblock_command
+            
+            # Verificar comando de troca de IP
+            if vehicle.get('comandotrocarip'):
+                logger.warning(f"🌐 SENDING IP CHANGE COMMAND to device {imei}")
+                # Comando para alterar IP do servidor
+                ip_command = f"AT+GTSER=gv50,1,0.0.0.0,8000,0,,,,,FFFF${self._generate_sequence()}$"
+                logger.log_outgoing_message(client_ip, imei, f"IP_CHANGE_COMMAND: {ip_command}")
+                return ip_command
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error checking pending commands for {imei}: {e}")
+            return None
+    
+    def _generate_sequence(self) -> str:
+        """Gerar sequência para comandos AT"""
+        from datetime import datetime
+        return datetime.now().strftime("%Y%m%d%H%M%S")[-4:]
 
     def save_vehicle_data(self, vehicle_data: Dict[str, Any]):
         """Save vehicle data to database - C# style method"""
