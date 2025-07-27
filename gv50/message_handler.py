@@ -90,6 +90,9 @@ class MessageHandler:
         """Update vehicle information in vehicles table"""
         try:
             imei = parsed_data.get('imei')
+            if not imei:
+                return
+                
             report_type = parsed_data.get('report_type', '')
             
             # Get existing vehicle or create basic structure
