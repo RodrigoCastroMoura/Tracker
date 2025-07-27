@@ -57,6 +57,9 @@ Preferred communication style: Simple, everyday language.
 ✓ Fixed critical desbloqueio logic: comandobloqueo=False now correctly sends unblock commands
 ✓ Both blocking (bit=1) and unblocking (bit=0) commands working perfectly via TCP
 ✓ Command logic matches C# exactly: True=block, False=unblock, None=no command
+✓ Implemented immediate command execution: Commands sent instantly when device connects
+✓ Enhanced system responsiveness: No need to wait for specific GPS protocol messages
+✓ Dual command system: Both immediate execution and traditional protocol-based commands work
 
 ## System Architecture
 

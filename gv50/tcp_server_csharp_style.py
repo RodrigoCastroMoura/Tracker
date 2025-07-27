@@ -179,9 +179,13 @@ class GV50TCPServerCSharpStyle:
                         imei = command_parts[2]
                         
                         # Registrar conexão por IMEI se for nova
-                        if imei not in self.connected_devices:
+                        first_connection = imei not in self.connected_devices
+                        if first_connection:
                             self.connected_devices[imei] = client_ip
                             logger.info(f"New device connected via GTFRI: IMEI {imei} from {client_ip}")
+                            # EXECUÇÃO IMEDIATA: Verificar comandos pendentes na primeira conexão
+                            logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (conexão inicial)")
+                            self.execute_immediate_commands(client_socket, imei)
                         
                         # Map fields exactly like C#
                         vehicle_data = {
@@ -211,9 +215,13 @@ class GV50TCPServerCSharpStyle:
                         imei = command_parts[2]
                         
                         # Registrar conexão por IMEI se for nova
-                        if imei not in self.connected_devices:
+                        first_connection = imei not in self.connected_devices
+                        if first_connection:
                             self.connected_devices[imei] = client_ip
                             logger.info(f"New device connected via {command_type}: IMEI {imei} from {client_ip}")
+                            # EXECUÇÃO IMEDIATA: Verificar comandos pendentes na primeira conexão
+                            logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (conexão inicial)")
+                            self.execute_immediate_commands(client_socket, imei)
                         
                         # Map fields exactly like C#
                         vehicle_data = {
@@ -379,6 +387,52 @@ class GV50TCPServerCSharpStyle:
     def get_connection_count(self) -> int:
         """Get current connection count - dispositivos únicos por IMEI"""
         return len(self.connected_devices)
+    
+    def execute_immediate_commands(self, client_socket: socket.socket, imei: str):
+        """EXECUÇÃO IMEDIATA: Executar comandos pendentes assim que dispositivo conecta"""
+        try:
+            # Verificar comando de bloqueio/desbloqueio pendente
+            vehicle = db_manager.get_vehicle_by_imei(imei)
+            if vehicle:
+                comando_pendente = vehicle.get('comandobloqueo')
+                if comando_pendente is not None:  # True ou False, não None
+                    # Determinar tipo de comando
+                    if comando_pendente == True:
+                        bit = "1"  # Bloquear
+                        acao = "BLOQUEAR"
+                    else:  # comando_pendente == False
+                        bit = "0"  # Desbloquear 
+                        acao = "DESBLOQUEAR"
+                    
+                    # Gerar comando exato do C#
+                    comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
+                    
+                    logger.warning(f"⚡ EXECUÇÃO IMEDIATA: {acao} para {imei}")
+                    logger.warning(f"⚡ COMANDO ENVIADO IMEDIATAMENTE: {comando}")
+                    
+                    # Enviar comando imediatamente via TCP
+                    self.send_data(client_socket, comando)
+                    
+                    # Limpar comando pendente (será recolocado se necessário)
+                    vehicle_data = dict(vehicle)
+                    if '_id' in vehicle_data:
+                        del vehicle_data['_id']
+                    vehicle_data['comandobloqueo'] = None
+                    from datetime import datetime
+                    vehicle_data['tsusermanu'] = datetime.utcnow()
+                    
+                    from models import Vehicle
+                    updated_vehicle = Vehicle(**vehicle_data)
+                    db_manager.upsert_vehicle(updated_vehicle)
+                    
+                    logger.info(f"✅ Comando {acao} executado imediatamente para {imei}")
+                else:
+                    logger.info(f"ℹ️  Nenhum comando pendente para {imei}")
+            else:
+                logger.info(f"ℹ️  Veículo {imei} não encontrado no banco")
+                
+        except Exception as e:
+            logger.error(f"Erro na execução imediata de comandos para {imei}: {e}")
     
     def send_heartbeat_if_needed(self, client_socket: socket.socket, client_ip: str):
         """Send heartbeat to keep TCP long-connection alive"""
