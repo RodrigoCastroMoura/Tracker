@@ -17,6 +17,7 @@ class GV50TCPServerCSharpStyle:
         self.client_sockets: List[socket.socket] = []
         self.listener_thread = None
         self.bytes_buffer = bytearray(999999999)  # Large buffer like C#
+        self.connected_devices: Dict[str, str] = {}  # IMEI -> IP mapping para controle de conexões únicas
     
     def start_server(self):
         """Start the TCP server - C# style"""
@@ -168,9 +169,16 @@ class GV50TCPServerCSharpStyle:
                 
                 if command_type == "GTFRI":
                     if len(command_parts) > 13:
+                        imei = command_parts[2]
+                        
+                        # Registrar conexão por IMEI se for nova
+                        if imei not in self.connected_devices:
+                            self.connected_devices[imei] = client_ip
+                            logger.info(f"New device connected via GTFRI: IMEI {imei} from {client_ip}")
+                        
                         # Map fields exactly like C#
                         vehicle_data = {
-                            'imei': command_parts[2],
+                            'imei': imei,
                             'speed': command_parts[8],
                             'altitude': command_parts[10],
                             'longitude': command_parts[11],
@@ -188,9 +196,16 @@ class GV50TCPServerCSharpStyle:
                         
                 elif command_type in ["GTIGN", "GTIGF"]:
                     if len(command_parts) > 11:
+                        imei = command_parts[2]
+                        
+                        # Registrar conexão por IMEI se for nova
+                        if imei not in self.connected_devices:
+                            self.connected_devices[imei] = client_ip
+                            logger.info(f"New device connected via {command_type}: IMEI {imei} from {client_ip}")
+                        
                         # Map fields exactly like C#
                         vehicle_data = {
-                            'imei': command_parts[2],
+                            'imei': imei,
                             'speed': command_parts[6],
                             'altitude': command_parts[8],
                             'longitude': command_parts[9],
@@ -254,18 +269,37 @@ class GV50TCPServerCSharpStyle:
             logger.error(f"Error processing BUFF message: {e}")
     
     def process_ack_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
-        """Process +ACK messages like C#"""
+        """Process +ACK messages like C# - filtrar heartbeats GTHBD"""
         try:
-            if len(command_parts) > 0 and command_parts[0] == "GTOUT":
-                if len(command_parts) > 4:
-                    imei = command_parts[2]
-                    status = command_parts[4]
-                    
-                    # Update vehicle blocking status like C#
-                    blocked = (status == "0000")
-                    message_handler.update_vehicle_blocking(imei, blocked)
-                    
-                    logger.info(f"Vehicle {imei} {'blocked' if blocked else 'unblocked'}")
+            if len(command_parts) > 0:
+                command_type = command_parts[0]
+                
+                # FILTRAR HEARTBEATS - não processar GTHBD como nova conexão
+                if command_type == "GTHBD":
+                    if len(command_parts) > 2:
+                        imei = command_parts[2]
+                        # Apenas registrar heartbeat no log, não como nova conexão
+                        logger.debug(f"Heartbeat received from IMEI {imei} at {client_ip}")
+                        
+                        # Verificar se dispositivo já está registrado
+                        if imei in self.connected_devices:
+                            logger.debug(f"Heartbeat from known device {imei}")
+                        else:
+                            # Primeira vez que vemos este IMEI - registrar conexão
+                            self.connected_devices[imei] = client_ip
+                            logger.info(f"New device connected: IMEI {imei} from {client_ip}")
+                    return  # Não processar heartbeat como mensagem normal
+                
+                elif command_type == "GTOUT":
+                    if len(command_parts) > 4:
+                        imei = command_parts[2]
+                        status = command_parts[4]
+                        
+                        # Update vehicle blocking status like C#
+                        blocked = (status == "0000")
+                        message_handler.update_vehicle_blocking(imei, blocked)
+                        
+                        logger.info(f"Vehicle {imei} {'blocked' if blocked else 'unblocked'}")
                     
         except Exception as e:
             logger.error(f"Error processing ACK message: {e}")
@@ -279,8 +313,8 @@ class GV50TCPServerCSharpStyle:
             logger.error(f"Error sending command: {e}")
     
     def get_connection_count(self) -> int:
-        """Get current connection count"""
-        return len(self.client_sockets)
+        """Get current connection count - dispositivos únicos por IMEI"""
+        return len(self.connected_devices)
     
     def send_heartbeat_if_needed(self, client_socket: socket.socket, client_ip: str):
         """Send heartbeat to keep TCP long-connection alive"""
@@ -296,6 +330,18 @@ class GV50TCPServerCSharpStyle:
         try:
             if client_socket in self.client_sockets:
                 self.client_sockets.remove(client_socket)
+            
+            # Remover dispositivo da lista de conectados quando desconectar
+            client_ip = connection_id.split(':')[0]
+            devices_to_remove = []
+            for imei, ip in self.connected_devices.items():
+                if ip == client_ip:
+                    devices_to_remove.append(imei)
+            
+            for imei in devices_to_remove:
+                del self.connected_devices[imei]
+                logger.info(f"Device disconnected: IMEI {imei}")
+            
             client_socket.close()
             logger.info(f"Cleaned up connection: {connection_id}")
         except:
