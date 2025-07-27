@@ -92,6 +92,10 @@ Preferred communication style: Simple, everyday language.
 ✓ Formato GTSRI: AT+GTSRI=gv50,1,0,,[novo_ip],[nova_porta],0,,,,,0001$ usando variáveis do .env
 ✓ Parser GTSRI adicionado: processa respostas de confirmação de troca de IP
 ✓ Sistema integrado: comando enviado imediatamente quando comandotrocarip=True
+✓ SISTEMA PRINCIPAL E BACKUP IMPLEMENTADO: Servidor principal e backup configuráveis
+✓ Variáveis do .env: PRIMARY_SERVER_IP, PRIMARY_SERVER_PORT, BACKUP_SERVER_IP, BACKUP_SERVER_PORT
+✓ Comando completo: AT+GTSRI=gv50,1,0,,192.168.1.100,8080,0,192.168.1.200,8080,0,,0001$
+✓ Sistema dual operacional: GTSRI (troca IP) + GTOUT (bloqueio) funcionando simultaneamente
 
 ## System Architecture
 

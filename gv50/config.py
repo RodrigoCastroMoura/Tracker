@@ -29,9 +29,15 @@ class Config:
     CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '3600'))  # 1 hour for long-connection
     MAX_CONNECTIONS: int = int(os.getenv('MAX_CONNECTIONS', '100'))
     
-    # IP Change Configuration - para comando AT+GTIPSET
-    NEW_DEVICE_IP: str = os.getenv('NEW_DEVICE_IP', '177.94.51.99')  # IP padrão para troca
-    NEW_DEVICE_PORT: int = int(os.getenv('NEW_DEVICE_PORT', '8000'))  # Porta padrão para troca
+    # Servidor Configuration - para comando AT+GTSRI com servidor principal e backup
+    PRIMARY_SERVER_IP: str = os.getenv('PRIMARY_SERVER_IP', '192.168.1.100')  # Servidor principal
+    PRIMARY_SERVER_PORT: int = int(os.getenv('PRIMARY_SERVER_PORT', '8080'))  # Porta principal
+    BACKUP_SERVER_IP: str = os.getenv('BACKUP_SERVER_IP', '192.168.1.200')   # Servidor backup
+    BACKUP_SERVER_PORT: int = int(os.getenv('BACKUP_SERVER_PORT', '8080'))   # Porta backup
+    
+    # Manter compatibilidade com variáveis antigas
+    NEW_DEVICE_IP: str = os.getenv('NEW_DEVICE_IP', PRIMARY_SERVER_IP)
+    NEW_DEVICE_PORT: int = int(os.getenv('NEW_DEVICE_PORT', str(PRIMARY_SERVER_PORT)))
     
     @classmethod
     def is_ip_allowed(cls, ip: str) -> bool:
