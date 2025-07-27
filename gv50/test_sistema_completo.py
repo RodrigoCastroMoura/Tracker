@@ -119,9 +119,8 @@ class TesteSistemaCompleto:
                 longitude="-46.633308",
                 latitude="-23.550520",  # São Paulo
                 altitude=760.0,
-                timestamp=datetime.utcnow(),
-                deviceTimestamp=datetime.utcnow(),
-                systemDate=datetime.utcnow(),
+                timestamp=datetime.utcnow(),  # Data do servidor
+                deviceTimestamp="20250724100000",  # Data do dispositivo apenas para referência
                 mensagem_raw="+RESP:GTFRI,060228,865083030999999,,0,0,1,1,4.3,92,70.0,-46.633308,-23.550520,20250724100000,0724,0000,18d8,6141,00,2000.0,12348$"
             )
             

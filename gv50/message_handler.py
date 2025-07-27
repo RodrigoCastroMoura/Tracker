@@ -38,9 +38,8 @@ class MessageHandler:
                 longitude=parsed_data.get('longitude'),
                 latitude=parsed_data.get('latitude'),
                 altitude=parsed_data.get('altitude'),
-                timestamp=current_time,
-                deviceTimestamp=parsed_data.get('device_timestamp', ''),
-                systemDate=current_time,
+                timestamp=current_time,  # Data do servidor
+                deviceTimestamp=parsed_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
                 mensagem_raw=raw_message
             )
             
@@ -136,9 +135,8 @@ class MessageHandler:
                 longitude=vehicle_data.get('longitude', '0'),
                 latitude=vehicle_data.get('latitude', '0'),
                 altitude=vehicle_data.get('altitude', '0'),
-                timestamp=current_time,
-                deviceTimestamp=vehicle_data.get('device_timestamp', ''),
-                systemDate=current_time,
+                timestamp=current_time,  # Data do servidor
+                deviceTimestamp=vehicle_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
                 mensagem_raw=vehicle_data.get('raw_message', '')
             )
             

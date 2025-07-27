@@ -9,9 +9,8 @@ class VehicleData:
     longitude: Optional[str] = None
     latitude: Optional[str] = None
     altitude: Optional[str] = None
-    timestamp: Optional[datetime] = None
-    deviceTimestamp: str = ""
-    systemDate: Optional[datetime] = None
+    timestamp: Optional[datetime] = None  # Data do servidor
+    deviceTimestamp: str = ""  # Data do dispositivo apenas para referência
     mensagem_raw: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
