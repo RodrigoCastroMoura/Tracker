@@ -202,6 +202,7 @@ class MessageHandler:
             
             # Debug da conversão
             logger.info(f"🔄 Converting device timestamp: '{device_timestamp_str}' -> {device_datetime_converted}")
+            logger.info(f"🔍 Conversion type: {type(device_datetime_converted)}")
             
             vehicle_record = VehicleData(
                 imei=vehicle_data.get('imei', ''),
