@@ -13,7 +13,7 @@ from datetime import datetime
 # Import GV50 service
 from config import Config as GV50Config
 from logger import logger as gv50_logger
-from tcp_server_csharp_style import tcp_server as gv50_tcp_server
+from tcp_server import tcp_server as gv50_tcp_server
 from database import db_manager as gv50_db_manager
 
 class GV50TrackerService:
