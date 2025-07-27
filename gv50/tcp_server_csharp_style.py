@@ -195,8 +195,13 @@ class GV50TCPServerCSharpStyle:
                             'raw_message': '+RESP:' + ','.join(command_parts)
                         }
                         
-                        # Save to database
-                        message_handler.save_vehicle_data(vehicle_data)
+                        # Process through message_handler (includes command logic)
+                        raw_message = '+RESP:' + ','.join(command_parts)
+                        response = message_handler.handle_incoming_message(raw_message, client_ip)
+                        
+                        # Send ACK response
+                        if response:
+                            self.send_data(client_socket, response)
                         
                         # Send command if needed
                         self.send_command(client_socket, vehicle_data['imei'])
@@ -383,6 +388,16 @@ class GV50TCPServerCSharpStyle:
             pass
         except Exception as e:
             logger.error(f"Error sending heartbeat to {client_ip}: {e}")
+    
+    def send_data(self, client_socket: socket.socket, data: str):
+        """Send data to client socket - equivalent to C# Send method"""
+        try:
+            if client_socket and data:
+                message_bytes = data.encode('ascii')
+                client_socket.send(message_bytes)
+                logger.debug(f"Data sent successfully: {data[:50]}...")
+        except Exception as e:
+            logger.error(f"Error sending data: {e}")
     
     def cleanup_connection(self, client_socket: socket.socket, connection_id: str):
         """Clean up connection"""

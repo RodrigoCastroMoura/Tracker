@@ -51,6 +51,9 @@ Preferred communication style: Simple, everyday language.
 ✓ Implemented exact C# command logic from original Program.cs file
 ✓ Fixed critical issue: commands now sent to device when comandobloqueo=true
 ✓ Command format matches C# exactly: AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$
+✓ TCP server integration completed: Commands sent via socket to real devices
+✓ Full bidirectional communication working: ACK + Command + Confirmation flow
+✓ System tested and verified: Blocking/unblocking commands fully operational
 
 ## System Architecture
 
