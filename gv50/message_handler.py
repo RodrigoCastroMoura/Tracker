@@ -34,13 +34,18 @@ class MessageHandler:
             
             # Create vehicle data record - apenas dados de localização
             current_time = datetime.utcnow()
+            
+            # Converter device timestamp para datetime
+            device_timestamp_str = parsed_data.get('device_timestamp', '')
+            device_datetime_converted = convert_device_timestamp(device_timestamp_str)
+            
             vehicle_data = VehicleData(
                 imei=imei,
                 longitude=parsed_data.get('longitude'),
                 latitude=parsed_data.get('latitude'),
                 altitude=parsed_data.get('altitude'),
                 timestamp=current_time,  # Data do servidor
-                deviceTimestamp=parsed_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+                deviceTimestamp=device_datetime_converted,  # Data do dispositivo convertida para datetime
                 mensagem_raw=raw_message
             )
             
@@ -196,13 +201,12 @@ class MessageHandler:
             # Convert dict to VehicleData object
             current_time = datetime.utcnow()
             
-            # Converter data do dispositivo
+            # Converter data do dispositivo para datetime
             device_timestamp_str = vehicle_data.get('device_timestamp', '')
             device_datetime_converted = convert_device_timestamp(device_timestamp_str)
             
             # Debug da conversão
             logger.info(f"🔄 Converting device timestamp: '{device_timestamp_str}' -> {device_datetime_converted}")
-            logger.info(f"🔍 Conversion type: {type(device_datetime_converted)}")
             
             vehicle_record = VehicleData(
                 imei=vehicle_data.get('imei', ''),
@@ -210,8 +214,7 @@ class MessageHandler:
                 latitude=vehicle_data.get('latitude', '0'),
                 altitude=vehicle_data.get('altitude', '0'),
                 timestamp=current_time,  # Data do servidor
-                deviceTimestamp=device_timestamp_str,  # Data do dispositivo original
-                deviceDateConverted=device_datetime_converted,  # Data do dispositivo convertida
+                deviceTimestamp=device_datetime_converted,  # Data do dispositivo convertida para datetime
                 mensagem_raw=vehicle_data.get('raw_message', '')
             )
             

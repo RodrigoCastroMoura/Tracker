@@ -10,8 +10,7 @@ class VehicleData:
     latitude: Optional[str] = None
     altitude: Optional[str] = None
     timestamp: Optional[datetime] = None  # Data do servidor
-    deviceTimestamp: str = ""  # Data do dispositivo apenas para referência
-    deviceDateConverted: Optional[datetime] = None  # Data do dispositivo convertida
+    deviceTimestamp: Optional[datetime] = None  # Data do dispositivo convertida para datetime
     mensagem_raw: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
