@@ -29,11 +29,12 @@ class Config:
     CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '3600'))  # 1 hour for long-connection
     MAX_CONNECTIONS: int = int(os.getenv('MAX_CONNECTIONS', '100'))
     
-    # Servidor Configuration - para comando AT+GTSRI com servidor principal e backup
-    PRIMARY_SERVER_IP: str = os.getenv('PRIMARY_SERVER_IP', '192.168.1.100')  # Servidor principal
-    PRIMARY_SERVER_PORT: int = int(os.getenv('PRIMARY_SERVER_PORT', '8080'))  # Porta principal
-    BACKUP_SERVER_IP: str = os.getenv('BACKUP_SERVER_IP', '192.168.1.200')   # Servidor backup
-    BACKUP_SERVER_PORT: int = int(os.getenv('BACKUP_SERVER_PORT', '8080'))   # Porta backup
+    # Servidor Configuration - para comando AT+GTSRI formato correto
+    # Valores padrão conforme especificação: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
+    PRIMARY_SERVER_IP: str = os.getenv('PRIMARY_SERVER_IP', '191.252.181.49')  # Servidor principal
+    PRIMARY_SERVER_PORT: int = int(os.getenv('PRIMARY_SERVER_PORT', '8000'))   # Porta principal
+    BACKUP_SERVER_IP: str = os.getenv('BACKUP_SERVER_IP', '191.252.181.49')   # Servidor backup (mesmo IP)
+    BACKUP_SERVER_PORT: int = int(os.getenv('BACKUP_SERVER_PORT', '8000'))    # Porta backup (mesma porta)
     
     # Manter compatibilidade com variáveis antigas
     NEW_DEVICE_IP: str = os.getenv('NEW_DEVICE_IP', PRIMARY_SERVER_IP)

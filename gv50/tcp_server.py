@@ -500,10 +500,10 @@ class GV50TCPServerCSharpStyle:
                 # 2. Verificar comando de troca de IP pendente - COMANDO GTSRI
                 comando_ip = vehicle.get('comandotrocarip')
                 if comando_ip == True:
-                    # Comando de troca de IP para GV50 usando GTSRI com servidor principal e backup
-                    # Formato: AT+GTSRI=gv50,1,0,,[ip_principal],[porta_principal],0,[ip_backup],[porta_backup],0,,0001$
+                    # Comando de troca de IP para GV50 usando GTSRI - formato exato conforme especificação
+                    # Formato: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
                     from config import Config
-                    comando_ip_cmd = f"AT+GTSRI=gv50,1,0,,{Config.PRIMARY_SERVER_IP},{Config.PRIMARY_SERVER_PORT},0,{Config.BACKUP_SERVER_IP},{Config.BACKUP_SERVER_PORT},0,,0001$"
+                    comando_ip_cmd = f"AT+GTSRI=gv50,3,,1,{Config.PRIMARY_SERVER_IP},{Config.PRIMARY_SERVER_PORT},{Config.BACKUP_SERVER_IP},{Config.BACKUP_SERVER_PORT},,60,0,0,0,,0,FFFF$"
                     
                     logger.warning(f"⚡ EXECUÇÃO IMEDIATA: TROCA DE IP (GTSRI) para {imei}")
                     logger.warning(f"⚡ COMANDO GTSRI ENVIADO: {comando_ip_cmd}")

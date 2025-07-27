@@ -94,7 +94,9 @@ Preferred communication style: Simple, everyday language.
 ✓ Sistema integrado: comando enviado imediatamente quando comandotrocarip=True
 ✓ SISTEMA PRINCIPAL E BACKUP IMPLEMENTADO: Servidor principal e backup configuráveis
 ✓ Variáveis do .env: PRIMARY_SERVER_IP, PRIMARY_SERVER_PORT, BACKUP_SERVER_IP, BACKUP_SERVER_PORT
-✓ Comando completo: AT+GTSRI=gv50,1,0,,192.168.1.100,8080,0,192.168.1.200,8080,0,,0001$
+✓ COMANDO GTSRI CORRIGIDO: Formato exato conforme especificação do usuário
+✓ Formato correto: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
+✓ Valores padrão configurados: servidor principal e backup usando mesmo IP/porta
 ✓ Sistema dual operacional: GTSRI (troca IP) + GTOUT (bloqueio) funcionando simultaneamente
 
 ## System Architecture
