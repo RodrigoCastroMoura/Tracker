@@ -136,12 +136,13 @@ class MessageHandler:
             if veiculo is None:
                 return
             
-            # Verificar comandobloqueo exatamente como no C#: if (DtoVeiculo.comandoBloqueo == true)
-            if veiculo.get('comandobloqueo') == True:
-                # Determinar bit baseado no status bloqueado (C#: switch (DtoVeiculo.bloqueado))
-                if veiculo.get('bloqueado') == True:
+            # Verificar se há comando pendente (True = bloquear, False = desbloquear)
+            comando_pendente = veiculo.get('comandobloqueo')
+            if comando_pendente is not None:  # True ou False, mas não None
+                # True = comando para bloquear, False = comando para desbloquear
+                if comando_pendente == True:
                     bit = "1"  # Bloquear
-                else:
+                else:  # comando_pendente == False
                     bit = "0"  # Desbloquear
                 
                 # Comando exato do C# para GV50: 

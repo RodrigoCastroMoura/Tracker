@@ -54,6 +54,9 @@ Preferred communication style: Simple, everyday language.
 ✓ TCP server integration completed: Commands sent via socket to real devices
 ✓ Full bidirectional communication working: ACK + Command + Confirmation flow
 ✓ System tested and verified: Blocking/unblocking commands fully operational
+✓ Fixed critical desbloqueio logic: comandobloqueo=False now correctly sends unblock commands
+✓ Both blocking (bit=1) and unblocking (bit=0) commands working perfectly via TCP
+✓ Command logic matches C# exactly: True=block, False=unblock, None=no command
 
 ## System Architecture
 
