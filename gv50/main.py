@@ -73,14 +73,7 @@ class GV50TrackerService:
             gv50_thread.start()
             self.service_threads.append(gv50_thread)
             
-            # Start GV50 monitoring thread
-            gv50_monitor_thread = threading.Thread(
-                target=self._gv50_monitoring_loop,
-                daemon=True,
-                name="GV50-Monitor"
-            )
-            gv50_monitor_thread.start()
-            self.service_threads.append(gv50_monitor_thread)
+            # No monitoring loop - direct operation only
             
             return True
             
@@ -110,48 +103,7 @@ class GV50TrackerService:
             print(f"GV50 Database connection test error: {e}")
             return False
     
-    def _gv50_monitoring_loop(self):
-        """Monitoring loop for GV50 service health"""
-        while self.running:
-            try:
-                time.sleep(30)  # Monitor every 30 seconds
-                
-                if not self.running:
-                    break
-                
-                # Log GV50 service status
-                connection_count = gv50_tcp_server.get_connection_count()
-                uptime = self._get_uptime()
-                
-                gv50_logger.debug(f"GV50 Status - Uptime: {uptime}, Active Connections: {connection_count}")
-                
-                # Update statistics
-                if connection_count > 0:
-                    self.stats['last_activity'] = datetime.utcnow()
-                
-                # Health check
-                if not self._gv50_health_check():
-                    gv50_logger.warning("GV50 service health check failed")
-                
-            except Exception as e:
-                gv50_logger.error(f"Error in GV50 monitoring loop: {e}")
-                time.sleep(10)
-    
-    def _gv50_health_check(self) -> bool:
-        """Perform GV50 service health check"""
-        try:
-            # Check database connection
-            gv50_db_manager.client.admin.command('ping')
-            
-            # Check if server is running
-            if not gv50_tcp_server.running:
-                return False
-            
-            return True
-            
-        except Exception as e:
-            gv50_logger.error(f"GV50 health check failed: {e}")
-            return False
+
     
     def stop(self):
         """Stop GV50 GPS tracker service"""
