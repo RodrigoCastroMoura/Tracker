@@ -1,0 +1,940 @@
+# 🔧 Prompt para Replit: Correções Completas do Sistema GPS
+
+## 📋 Objetivos
+Corrigir **3 problemas críticos** no sistema de GPS tracker:
+
+1. **Timestamps incorretos** - Sistema usando data do dispositivo em vez do servidor
+2. **Heartbeats como novas conexões** - `+ACK:GTHBD` está sendo contado como nova conexão
+3. **GTSTT não processado** - Mensagens de mudança de estado não estão sendo capturadas
+
+## 🚨 Problemas Identificados
+
+### ❌ Problema 1: Timestamps
+- A data do sistema está sendo a mesma do dispositivo
+- Isso causa inconsistência temporal nos dados
+- Logs e banco de dados ficam com timestamps incorretos
+
+### ❌ Problema 2: Heartbeats duplicando conexões  
+- Cada mensagem `+ACK:GTHBD` está sendo contada como nova conexão
+- O mesmo dispositivo aparece múltiplas vezes como "conectado"
+- Estatísticas de conexões ficam incorretas
+
+### ❌ Problema 3: GTSTT não capturado
+- Mensagens `+RESP:GTSTT` não estão sendo processadas
+- Mudanças de estado do dispositivo (ex: "41" = Sensor Rest) não são salvas
+- Perda de informações importantes sobre status do veículo
+
+## ✅ Soluções Requeridas
+
+### 🔧 Solução 1: Timestamps do Servidor
+Separar claramente:
+- **Data do servidor**: SEMPRE datetime.utcnow() quando a mensagem é RECEBIDA
+- **Data do dispositivo**: Apenas para referência/debug
+
+### 🔧 Solução 2: Controle de Conexões por IMEI
+- Rastrear conexões por IMEI único, não por socket
+- Heartbeats `+ACK:GTHBD` apenas atualizam timestamp, não criam nova conexão
+- Thread safety com locks para evitar condições de corrida
+
+### 🔧 Solução 3: Suporte para GTSTT
+- Adicionar parser para mensagens `+RESP:GTSTT`
+- Interpretar códigos de estado (41=Sensor Rest, 42=Sensor Motion, etc)
+- Salvar mudanças de estado no banco de dados
+
+---
+
+## 📁 Arquivo 1: `gv50/protocol_parser.py`
+
+### ✅ ADICIONAR suporte para GTSTT:
+
+1. **Na função `__init__()`**, adicionar padrão GTSTT:
+```python
+self.message_patterns = {
+    # ... padrões existentes ...
+    'GTSTT': r'\+(?P<msg_type>RESP|BUFF|ACK):GTSTT,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<state>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved>[^,]*),(?P<count>[^$]*)\
+
+## 📁 Arquivo 3: `gv50/message_handler.py`
+
+### ✅ CORREÇÃO de timestamps:
+
+1. **Na função `handle_incoming_message()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor - NUNCA do dispositivo
+server_timestamp = datetime.utcnow()
+
+# Create vehicle data record
+vehicle_data = VehicleData(
+    imei=imei,
+    longitude=parsed_data.get('longitude'),
+    latitude=parsed_data.get('latitude'),
+    altitude=parsed_data.get('altitude'),
+    timestamp=server_timestamp,  # ✅ Data do SERVIDOR
+    deviceTimestamp=parsed_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+    systemDate=server_timestamp,  # ✅ Data do SERVIDOR
+    mensagem_raw=raw_message
+)
+```
+
+2. **Na função `save_vehicle_data()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_record = VehicleData(
+    imei=vehicle_data.get('imei', ''),
+    longitude=vehicle_data.get('longitude', '0'),
+    latitude=vehicle_data.get('latitude', '0'),
+    altitude=vehicle_data.get('altitude', '0'),
+    timestamp=server_timestamp,  # ✅ Data do SERVIDOR
+    deviceTimestamp=vehicle_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+    systemDate=server_timestamp,  # ✅ Data do SERVIDOR
+    mensagem_raw=vehicle_data.get('raw_message', '')
+)
+
+# Log com timestamps separados para debugar
+logger.debug(f"Saved vehicle data for IMEI: {vehicle_data.get('imei')} - Server Time: {server_timestamp.strftime('%Y-%m-%d %H:%M:%S')} - Device Time: {vehicle_data.get('device_timestamp', 'N/A')}")
+```
+
+3. **Atualizar TODAS as funções que fazem update**, sempre usando:**
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_data = {
+    'IMEI': imei,
+    # ... outros campos ...
+    'tsusermanu': server_timestamp  # ✅ Data do SERVIDOR
+}
+```
+
+---
+
+## 📁 Arquivo 4: `gv50/models.py`
+
+### ✅ CORREÇÃO dos modelos:
+
+```python
+@dataclass
+class VehicleData:
+    """Vehicle tracking data model - com timestamps separados"""
+    imei: str
+    longitude: Optional[str] = None
+    latitude: Optional[str] = None
+    altitude: Optional[str] = None
+    
+    # ✅ TIMESTAMPS SEPARADOS - IMPORTANTE
+    timestamp: Optional[datetime] = None  # SEMPRE timestamp do servidor (UTC)
+    systemDate: Optional[datetime] = None  # SEMPRE timestamp do servidor (UTC) 
+    deviceTimestamp: str = ""  # Timestamp do dispositivo (apenas para referência/debug)
+    
+    mensagem_raw: Optional[str] = None
+    
+    def __post_init__(self):
+        """Garantir que timestamps do servidor sejam sempre atuais"""
+        current_time = datetime.utcnow()
+        
+        # ✅ FORÇAR timestamp do servidor se não foi definido
+        if self.timestamp is None:
+            self.timestamp = current_time
+        
+        if self.systemDate is None:
+            self.systemDate = current_time
+
+@dataclass
+class Vehicle:
+    # ... campos existentes ...
+    
+    # ✅ TIMESTAMP DO SERVIDOR - NUNCA do dispositivo
+    tsusermanu: Optional[datetime] = None  # Última atualização (timestamp do servidor)
+    
+    def __post_init__(self):
+        """Garantir que timestamp seja sempre do servidor"""
+        if self.tsusermanu is None:
+            self.tsusermanu = datetime.utcnow()  # ✅ SEMPRE timestamp do servidor
+```
+
+---
+
+## 📊 Resultados Esperados Após as Correções
+
+### ✅ 1. Timestamps Corretos:
+```
+GTSTT - IMEI: 865083030086961 | Server Time: 2025-01-26 18:30:45 | Device Time: 20250726143045 | State: 41 (Sensor Rest)
+Saved vehicle data for IMEI: 865083030086961 - Server Time: 2025-01-26 18:30:45 - Device Time: 20250726143045
+```
+
+### ✅ 2. Conexões Únicas por IMEI:
+```
+NEW DEVICE CONNECTION: IMEI 865083030086961 from 192.168.1.100
+Device 865083030086961 connected from 192.168.1.100 at 2025-01-26 15:30:45
+
+[DEBUG] Heartbeat from IMEI 865083030086961  # Heartbeats subsequentes
+[DEBUG] Activity from known device: IMEI 865083030086961
+```
+
+### ✅ 3. GTSTT Processado:
+```
+📱 Device State Change: IMEI 865083030086961 -> Sensor Rest (No Ignition Signal)
+GTSTT: IMEI 865083030086961 - State: 41 (Sensor Rest (No Ignition Signal))
+```
+
+### ✅ 4. Estrutura no Banco:
+```json
+{
+  "imei": "865083030086961",
+  "timestamp": "2025-01-26T18:30:45.123Z",     // ✅ SERVIDOR
+  "systemDate": "2025-01-26T18:30:45.123Z",   // ✅ SERVIDOR  
+  "deviceTimestamp": "20250726143045",         // ❓ DISPOSITIVO (referência)
+  "device_state": "41",                        // ✅ NOVO: Estado do dispositivo
+  "state_description": "Sensor Rest (No Ignition Signal)", // ✅ NOVO
+  "longitude": "-46.778597",
+  "latitude": "-23.5"
+}
+```
+
+---
+
+## 🎯 Mensagem de Teste
+
+Use esta mensagem para validar todas as correções:
+```
++RESP:GTSTT,090302,865083030086961,,41,0,0.0,76,744.6,-46.778597,-23.5
+```
+
+E esta para heartbeat:
+```
++ACK:GTHBD,090302,865083030086961,,20250724055411,0497$
+```
+
+## ✅ Validação Final
+
+Após as alterações, você deve ver:
+- ✅ **Timestamps** do servidor sempre atuais (UTC)
+- ✅ **Heartbeats** não duplicam conexões  
+- ✅ **GTSTT** sendo processado e salvo
+- ✅ **Logs** separando timestamps do servidor vs dispositivo
+- ✅ **Conexões únicas** por IMEI (não por socket)
+- ✅ **Estados de dispositivo** interpretados corretamente
+
+## 🚀 Instruções para Replit
+
+1. **Faça backup** de todos os arquivos mencionados
+2. **Aplique as alterações** nos 4 arquivos na ordem apresentada
+3. **Teste** com a mensagem GTSTT fornecida
+4. **Verifique** que heartbeats não criam novas conexões
+5. **Confirme** logs com timestamps separados
+6. **Valide** no banco os dados do GTSTT com timestamps corretos📊 Resultado Esperado
+
+### Logs corrigidos:
+```
+GTSTT - IMEI: 865083030086961 | Server Time: 2025-01-26 18:30:45 | Device Time: 20250726143045 | State: 41 (Sensor Rest)
+📱 Device State Change: IMEI 865083030086961 -> Sensor Rest [Server: 2025-01-26 18:30:45]
+
+Saved vehicle data for IMEI: 865083030086961 - Server Time: 2025-01-26 18:30:45 - Device Time: 20250726143045
+```
+
+### Estrutura no banco:
+```json
+{
+  "imei": "865083030086961",
+  "timestamp": "2025-01-26T18:30:45.123Z",     // ✅ SERVIDOR
+  "systemDate": "2025-01-26T18:30:45.123Z",   // ✅ SERVIDOR  
+  "deviceTimestamp": "20250726143045",         // ❓ DISPOSITIVO (referência)
+  "longitude": "-46.778597",
+  "latitude": "-23.5"
+}
+```
+
+---
+
+## 🎯 Instruções para o Replit
+
+1. **Faça backup** dos arquivos atuais
+2. **Aplique as alterações** nos 3 arquivos mencionados
+3. **Teste** com uma mensagem do dispositivo
+4. **Verifique** se os logs mostram timestamps separados
+5. **Confirme** no banco que `timestamp` e `systemDate` são do servidor
+6. **Valide** que `deviceTimestamp` é apenas string para referência
+
+## ✅ Validação Final
+
+Após as alterações, você deve ver:
+- ✅ Timestamps do servidor sempre atuais (UTC)
+- ✅ Timestamps do dispositivo apenas como referência
+- ✅ Logs separando claramente as duas datas
+- ✅ Consistência temporal nos dados do banco
+- ✅ Auditoria correta de quando o servidor recebeu vs quando o dispositivo enviou
+}
+```
+
+2. **Na função `parse_message()`**, adicionar caso GTSTT:
+```python
+elif message_type == 'GTSTT':
+    return self._parse_gtstt(message)  # ✅ NOVO
+```
+
+3. **ADICIONAR nova função `_parse_gtstt()`**:
+```python
+def _parse_gtstt(self, message: str) -> Dict[str, str]:
+    """Parse GTSTT message (Status State Change Report)"""
+    try:
+        # Remove prefix and suffix
+        if not message.startswith('+') or not message.endswith('
+
+## 📁 Arquivo 1: `gv50/message_handler.py`
+
+### Alterações necessárias:
+
+1. **Na função `handle_incoming_message()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor - NUNCA do dispositivo
+server_timestamp = datetime.utcnow()
+
+# Create vehicle data record
+vehicle_data = VehicleData(
+    imei=imei,
+    longitude=parsed_data.get('longitude'),
+    latitude=parsed_data.get('latitude'),
+    altitude=parsed_data.get('altitude'),
+    timestamp=server_timestamp,  # ✅ Data do SERVIDOR
+    deviceTimestamp=parsed_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+    systemDate=server_timestamp,  # ✅ Data do SERVIDOR
+    mensagem_raw=raw_message
+)
+```
+
+2. **Na função `_update_vehicle_info()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_data = {
+    'IMEI': imei,
+    'tsusermanu': server_timestamp  # ✅ Data do SERVIDOR
+}
+```
+
+3. **Na função `save_vehicle_data()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_record = VehicleData(
+    imei=vehicle_data.get('imei', ''),
+    longitude=vehicle_data.get('longitude', '0'),
+    latitude=vehicle_data.get('latitude', '0'),
+    altitude=vehicle_data.get('altitude', '0'),
+    timestamp=server_timestamp,  # ✅ Data do SERVIDOR
+    deviceTimestamp=vehicle_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+    systemDate=server_timestamp,  # ✅ Data do SERVIDOR
+    mensagem_raw=vehicle_data.get('raw_message', '')
+)
+
+# Log com timestamps separados para debugar
+logger.debug(f"Saved vehicle data for IMEI: {vehicle_data.get('imei')} - Server Time: {server_timestamp.strftime('%Y-%m-%d %H:%M:%S')} - Device Time: {vehicle_data.get('device_timestamp', 'N/A')}")
+```
+
+4. **Atualizar todas as funções que fazem update:**
+- `update_vehicle_ignition()`
+- `update_vehicle_blocking()`
+- `set_blocking_command()`
+- `set_ip_change_command()`
+
+Em todas, adicionar:
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_data = {
+    'IMEI': imei,
+    # ... outros campos ...
+    'tsusermanu': server_timestamp  # ✅ Data do SERVIDOR
+}
+```
+
+---
+
+## 📁 Arquivo 2: `gv50/models.py`
+
+### Alterações no modelo `VehicleData`:
+
+```python
+@dataclass
+class VehicleData:
+    """Vehicle tracking data model - apenas dados de localização com timestamps separados"""
+    imei: str
+    longitude: Optional[str] = None
+    latitude: Optional[str] = None
+    altitude: Optional[str] = None
+    
+    # ✅ TIMESTAMPS SEPARADOS - IMPORTANTE
+    timestamp: Optional[datetime] = None  # SEMPRE timestamp do servidor (UTC)
+    systemDate: Optional[datetime] = None  # SEMPRE timestamp do servidor (UTC) 
+    deviceTimestamp: str = ""  # Timestamp do dispositivo (apenas para referência/debug)
+    
+    mensagem_raw: Optional[str] = None
+    
+    def __post_init__(self):
+        """Garantir que timestamps do servidor sejam sempre atuais"""
+        current_time = datetime.utcnow()
+        
+        # ✅ FORÇAR timestamp do servidor se não foi definido
+        if self.timestamp is None:
+            self.timestamp = current_time
+        
+        if self.systemDate is None:
+            self.systemDate = current_time
+```
+
+### Alterações no modelo `Vehicle`:
+
+```python
+@dataclass
+class Vehicle:
+    # ... campos existentes ...
+    
+    # ✅ TIMESTAMP DO SERVIDOR - NUNCA do dispositivo
+    tsusermanu: Optional[datetime] = None  # Última atualização (timestamp do servidor)
+    
+    def __post_init__(self):
+        """Garantir que timestamp seja sempre do servidor"""
+        if self.tsusermanu is None:
+            self.tsusermanu = datetime.utcnow()  # ✅ SEMPRE timestamp do servidor
+```
+
+---
+
+## 📁 Arquivo 3: `gv50/tcp_server_csharp_style.py`
+
+### Na função `process_resp_message()`:
+
+```python
+def process_resp_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
+    """Process +RESP messages like C# - TIMESTAMP DO SERVIDOR SEMPRE"""
+    try:
+        if len(command_parts) > 0:
+            command_type = command_parts[0]
+            
+            # ✅ SEMPRE usar timestamp do servidor - NUNCA do dispositivo
+            server_timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            if command_type == "GTFRI":
+                if len(command_parts) > 13:
+                    vehicle_data = {
+                        'imei': command_parts[2],
+                        'speed': command_parts[8],
+                        'altitude': command_parts[10],
+                        'longitude': command_parts[11],
+                        'latitude': command_parts[12],
+                        'device_timestamp': command_parts[13],  # Apenas para referência
+                        'server_timestamp': server_timestamp,  # ✅ Data do SERVIDOR
+                        'raw_message': '+RESP:' + ','.join(command_parts)
+                    }
+                    
+                    # Log separando timestamps
+                    logger.debug(f"GTFRI - IMEI: {vehicle_data['imei']} | Server Time: {server_timestamp} | Device Time: {command_parts[13]}")
+```
+
+### Aplicar a mesma lógica para:
+- `GTIGN` e `GTIGF`
+- `GTSTT` 
+- `process_buff_message()`
+
+Sempre usando:
+- `server_timestamp` para salvar no banco
+- `device_timestamp` apenas para logs/referência
+
+---
+
+## 📊 Resultado Esperado
+
+### Logs corrigidos:
+```
+GTSTT - IMEI: 865083030086961 | Server Time: 2025-01-26 18:30:45 | Device Time: 20250726143045 | State: 41 (Sensor Rest)
+📱 Device State Change: IMEI 865083030086961 -> Sensor Rest [Server: 2025-01-26 18:30:45]
+
+Saved vehicle data for IMEI: 865083030086961 - Server Time: 2025-01-26 18:30:45 - Device Time: 20250726143045
+```
+
+### Estrutura no banco:
+```json
+{
+  "imei": "865083030086961",
+  "timestamp": "2025-01-26T18:30:45.123Z",     // ✅ SERVIDOR
+  "systemDate": "2025-01-26T18:30:45.123Z",   // ✅ SERVIDOR  
+  "deviceTimestamp": "20250726143045",         // ❓ DISPOSITIVO (referência)
+  "longitude": "-46.778597",
+  "latitude": "-23.5"
+}
+```
+
+---
+
+## 🎯 Instruções para o Replit
+
+1. **Faça backup** dos arquivos atuais
+2. **Aplique as alterações** nos 3 arquivos mencionados
+3. **Teste** com uma mensagem do dispositivo
+4. **Verifique** se os logs mostram timestamps separados
+5. **Confirme** no banco que `timestamp` e `systemDate` são do servidor
+6. **Valide** que `deviceTimestamp` é apenas string para referência
+
+## ✅ Validação Final
+
+Após as alterações, você deve ver:
+- ✅ Timestamps do servidor sempre atuais (UTC)
+- ✅ Timestamps do dispositivo apenas como referência
+- ✅ Logs separando claramente as duas datas
+- ✅ Consistência temporal nos dados do banco
+- ✅ Auditoria correta de quando o servidor recebeu vs quando o dispositivo enviou):
+            return {'error': 'Invalid GTSTT message format'}
+        
+        # Split by ':' first to get msg_type and data part
+        msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+        if len(msg_parts) != 2:
+            return {'error': 'Invalid GTSTT message structure'}
+        
+        msg_type = msg_parts[0]  # RESP, BUFF, ACK
+        data_part = msg_parts[1]
+        
+        # Split data part by comma
+        fields = data_part.split(',')
+        
+        if len(fields) < 11:  # Minimum required fields for GTSTT
+            return {'error': f'Insufficient fields in GTSTT: {len(fields)}'}
+        
+        # Map fields according to GTSTT protocol
+        data = {
+            'msg_type': msg_type,
+            'report_type': 'GTSTT',
+            'protocol_version': fields[1] if len(fields) > 1 else '',
+            'imei': fields[2] if len(fields) > 2 else '',
+            'device_name': fields[3] if len(fields) > 3 else '',
+            'state': fields[4] if len(fields) > 4 else '',  # Estado do dispositivo (41, 42, etc)
+            'gps_accuracy': fields[5] if len(fields) > 5 else '0',
+            'speed': fields[6] if len(fields) > 6 else '0',
+            'course': fields[7] if len(fields) > 7 else '0',
+            'altitude': fields[8] if len(fields) > 8 else '0',
+            'longitude': fields[9] if len(fields) > 9 else '0',
+            'latitude': fields[10] if len(fields) > 10 else '0',
+            'device_timestamp': fields[11] if len(fields) > 11 else '',
+            'count': fields[17] if len(fields) > 17 else '0'
+        }
+        
+        # Interpretar o estado do dispositivo
+        device_state = data.get('state', '')
+        data['device_status_description'] = self._interpret_device_state(device_state)
+        
+        # Convert numeric fields
+        self._convert_numeric_fields(data)
+        
+        logger.info(f"GTSTT: IMEI {data.get('imei')} - State: {device_state} ({data['device_status_description']})")
+        return data
+        
+    except Exception as e:
+        logger.error(f"Error parsing GTSTT: {e}")
+        return {'error': f'GTSTT parse error: {str(e)}'}
+
+def _interpret_device_state(self, state: str) -> str:
+    """Interpret device state code"""
+    state_map = {
+        '11': 'Ignition OFF + Rest',
+        '12': 'Ignition OFF + Motion', 
+        '16': 'Towed',
+        '1A': 'Fake Tow',
+        '21': 'Ignition ON + Rest',
+        '22': 'Ignition ON + Motion',
+        '41': 'Sensor Rest (No Ignition Signal)',  # ✅ Estado da sua mensagem
+        '42': 'Sensor Motion (No Ignition Signal)'
+    }
+    return state_map.get(state, f'Unknown State ({state})')
+```
+
+4. **Na função `_detect_message_type()`**, adicionar GTSTT:
+```python
+def _detect_message_type(self, message: str) -> Optional[str]:
+    """Detect message type from the message content"""
+    # Adicionado GTSTT na detecção
+    message_types = ['GTFRI', 'GTIGN', 'GTIGF', 'GTOUT', 'GTSTT']
+    
+    for msg_type in message_types:
+        if f':{msg_type},' in message:
+            return msg_type
+    return None
+```
+
+---
+
+## 📁 Arquivo 2: `gv50/tcp_server_csharp_style.py`
+
+### ✅ CORREÇÃO COMPLETA para controle de conexões e GTSTT:
+
+1. **ADICIONAR no `__init__()`**:
+```python
+def __init__(self):
+    self.server_socket = None
+    self.running = False
+    self.client_sockets: List[socket.socket] = []
+    self.active_connections: Dict[str, Dict] = {}  # ✅ Track connections by IMEI
+    self.connection_lock = threading.Lock()  # ✅ Thread safety
+    self.listener_thread = None
+    self.bytes_buffer = bytearray(999999999)
+```
+
+2. **ADICIONAR funções de controle de conexão**:
+```python
+def register_device_connection(self, imei: str, client_socket: socket.socket, client_ip: str):
+    """Register a device connection - only count each IMEI once"""
+    with self.connection_lock:
+        if imei not in self.active_connections:
+            self.active_connections[imei] = {
+                'socket': client_socket,
+                'ip': client_ip,
+                'connected_at': time.time(),
+                'last_heartbeat': time.time(),
+                'message_count': 0
+            }
+            logger.info(f"NEW DEVICE CONNECTION: IMEI {imei} from {client_ip}")
+            print(f"Device {imei} connected from {client_ip} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            # Device already connected - update last activity
+            self.active_connections[imei]['last_heartbeat'] = time.time()
+            self.active_connections[imei]['message_count'] += 1
+            logger.debug(f"Activity from known device: IMEI {imei}")
+
+def unregister_device_connection(self, imei: str):
+    """Unregister a device connection"""
+    with self.connection_lock:
+        if imei in self.active_connections:
+            connection_info = self.active_connections[imei]
+            duration = time.time() - connection_info['connected_at']
+            logger.info(f"DEVICE DISCONNECTED: IMEI {imei}, Duration: {duration:.0f}s, Messages: {connection_info['message_count']}")
+            del self.active_connections[imei]
+
+def extract_imei_from_message(self, message: str) -> Optional[str]:
+    """Extract IMEI from any message format"""
+    try:
+        # Split by comma and look for IMEI pattern (15 digits)
+        parts = message.split(',')
+        for part in parts:
+            part = part.strip()
+            if len(part) == 15 and part.isdigit():
+                return part
+        return None
+    except:
+        return None
+
+def get_connection_count(self) -> int:
+    """Get current UNIQUE device connection count (by IMEI)"""
+    with self.connection_lock:
+        return len(self.active_connections)
+
+def get_active_devices(self) -> List[str]:
+    """Get list of active device IMEIs"""
+    with self.connection_lock:
+        return list(self.active_connections.keys())
+```
+
+3. **MODIFICAR `read_callback()`** para detectar heartbeats:
+```python
+def read_callback(self, client_socket: socket.socket, data: bytes, client_ip: str) -> Optional[str]:
+    """Process received data - com controle de heartbeat"""
+    try:
+        # ... código de decodificação existente ...
+        
+        # ✅ Check if this is a heartbeat message
+        if "+ACK:GTHBD" in message:
+            # Extract IMEI from heartbeat
+            imei = self.extract_imei_from_message(message)
+            if imei:
+                # Update last heartbeat time but don't log as new connection
+                with self.connection_lock:
+                    if imei in self.active_connections:
+                        self.active_connections[imei]['last_heartbeat'] = time.time()
+                        logger.debug(f"Heartbeat from IMEI {imei}")
+                    else:
+                        # First heartbeat from this device
+                        self.register_device_connection(imei, client_socket, client_ip)
+            return imei
+        
+        # Log the message like C# (only non-heartbeat messages)
+        print(f"\nMessage received {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(message)
+        
+        # ... resto do código existente ...
+    except Exception as e:
+        logger.error(f"Error in read_callback: {e}")
+        return None
+```
+
+4. **MODIFICAR `process_resp_message()`** para incluir GTSTT e timestamps corretos:
+```python
+def process_resp_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
+    """Process +RESP messages - COM GTSTT E TIMESTAMPS CORRETOS"""
+    try:
+        if len(command_parts) > 0:
+            command_type = command_parts[0]
+            
+            # ✅ SEMPRE usar timestamp do servidor - NUNCA do dispositivo
+            server_timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # ... código existente para GTFRI, GTIGN, GTIGF ...
+            
+            # ✅ NOVO: Suporte para GTSTT (Status State Change)
+            elif command_type == "GTSTT":
+                if len(command_parts) > 10:
+                    # Map fields for GTSTT
+                    vehicle_data = {
+                        'imei': command_parts[2],
+                        'device_state': command_parts[4],  # Estado do dispositivo (41, 42, etc)
+                        'gps_accuracy': command_parts[5],
+                        'speed': command_parts[6],
+                        'course': command_parts[7],
+                        'altitude': command_parts[8],
+                        'longitude': command_parts[9],
+                        'latitude': command_parts[10],
+                        'device_timestamp': command_parts[11] if len(command_parts) > 11 else '',
+                        'server_timestamp': server_timestamp,  # ✅ Data do SERVIDOR
+                        'raw_message': '+RESP:' + ','.join(command_parts)
+                    }
+                    
+                    # Interpretar o estado do dispositivo
+                    state_description = self.interpret_device_state(vehicle_data['device_state'])
+                    vehicle_data['state_description'] = state_description
+                    
+                    # Log detalhado para GTSTT
+                    logger.info(f"GTSTT: IMEI {vehicle_data['imei']} - State: {vehicle_data['device_state']} ({state_description})")
+                    print(f"📱 Device State Change: IMEI {vehicle_data['imei']} -> {state_description}")
+                    
+                    # Save to database
+                    message_handler.save_vehicle_data(vehicle_data)
+                    
+                    # Send command if needed
+                    self.send_command(client_socket, vehicle_data['imei'])
+                    
+    except Exception as e:
+        logger.error(f"Error processing RESP message: {e}")
+
+def interpret_device_state(self, state: str) -> str:
+    """Interpret device state code for GTSTT"""
+    state_map = {
+        '11': 'Ignition OFF + Rest',
+        '12': 'Ignition OFF + Motion', 
+        '16': 'Towed',
+        '1A': 'Fake Tow',
+        '21': 'Ignition ON + Rest',
+        '22': 'Ignition ON + Motion',
+        '41': 'Sensor Rest (No Ignition Signal)',  # ✅ Sua mensagem
+        '42': 'Sensor Motion (No Ignition Signal)'
+    }
+    return state_map.get(state, f'Unknown State ({state})')
+```
+
+---
+
+## 📁 Arquivo 1: `gv50/message_handler.py`
+
+### Alterações necessárias:
+
+1. **Na função `handle_incoming_message()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor - NUNCA do dispositivo
+server_timestamp = datetime.utcnow()
+
+# Create vehicle data record
+vehicle_data = VehicleData(
+    imei=imei,
+    longitude=parsed_data.get('longitude'),
+    latitude=parsed_data.get('latitude'),
+    altitude=parsed_data.get('altitude'),
+    timestamp=server_timestamp,  # ✅ Data do SERVIDOR
+    deviceTimestamp=parsed_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+    systemDate=server_timestamp,  # ✅ Data do SERVIDOR
+    mensagem_raw=raw_message
+)
+```
+
+2. **Na função `_update_vehicle_info()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_data = {
+    'IMEI': imei,
+    'tsusermanu': server_timestamp  # ✅ Data do SERVIDOR
+}
+```
+
+3. **Na função `save_vehicle_data()`:**
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_record = VehicleData(
+    imei=vehicle_data.get('imei', ''),
+    longitude=vehicle_data.get('longitude', '0'),
+    latitude=vehicle_data.get('latitude', '0'),
+    altitude=vehicle_data.get('altitude', '0'),
+    timestamp=server_timestamp,  # ✅ Data do SERVIDOR
+    deviceTimestamp=vehicle_data.get('device_timestamp', ''),  # Data do dispositivo apenas para referência
+    systemDate=server_timestamp,  # ✅ Data do SERVIDOR
+    mensagem_raw=vehicle_data.get('raw_message', '')
+)
+
+# Log com timestamps separados para debugar
+logger.debug(f"Saved vehicle data for IMEI: {vehicle_data.get('imei')} - Server Time: {server_timestamp.strftime('%Y-%m-%d %H:%M:%S')} - Device Time: {vehicle_data.get('device_timestamp', 'N/A')}")
+```
+
+4. **Atualizar todas as funções que fazem update:**
+- `update_vehicle_ignition()`
+- `update_vehicle_blocking()`
+- `set_blocking_command()`
+- `set_ip_change_command()`
+
+Em todas, adicionar:
+```python
+# ✅ SEMPRE usar timestamp do servidor
+server_timestamp = datetime.utcnow()
+
+vehicle_data = {
+    'IMEI': imei,
+    # ... outros campos ...
+    'tsusermanu': server_timestamp  # ✅ Data do SERVIDOR
+}
+```
+
+---
+
+## 📁 Arquivo 2: `gv50/models.py`
+
+### Alterações no modelo `VehicleData`:
+
+```python
+@dataclass
+class VehicleData:
+    """Vehicle tracking data model - apenas dados de localização com timestamps separados"""
+    imei: str
+    longitude: Optional[str] = None
+    latitude: Optional[str] = None
+    altitude: Optional[str] = None
+    
+    # ✅ TIMESTAMPS SEPARADOS - IMPORTANTE
+    timestamp: Optional[datetime] = None  # SEMPRE timestamp do servidor (UTC)
+    systemDate: Optional[datetime] = None  # SEMPRE timestamp do servidor (UTC) 
+    deviceTimestamp: str = ""  # Timestamp do dispositivo (apenas para referência/debug)
+    
+    mensagem_raw: Optional[str] = None
+    
+    def __post_init__(self):
+        """Garantir que timestamps do servidor sejam sempre atuais"""
+        current_time = datetime.utcnow()
+        
+        # ✅ FORÇAR timestamp do servidor se não foi definido
+        if self.timestamp is None:
+            self.timestamp = current_time
+        
+        if self.systemDate is None:
+            self.systemDate = current_time
+```
+
+### Alterações no modelo `Vehicle`:
+
+```python
+@dataclass
+class Vehicle:
+    # ... campos existentes ...
+    
+    # ✅ TIMESTAMP DO SERVIDOR - NUNCA do dispositivo
+    tsusermanu: Optional[datetime] = None  # Última atualização (timestamp do servidor)
+    
+    def __post_init__(self):
+        """Garantir que timestamp seja sempre do servidor"""
+        if self.tsusermanu is None:
+            self.tsusermanu = datetime.utcnow()  # ✅ SEMPRE timestamp do servidor
+```
+
+---
+
+## 📁 Arquivo 3: `gv50/tcp_server_csharp_style.py`
+
+### Na função `process_resp_message()`:
+
+```python
+def process_resp_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
+    """Process +RESP messages like C# - TIMESTAMP DO SERVIDOR SEMPRE"""
+    try:
+        if len(command_parts) > 0:
+            command_type = command_parts[0]
+            
+            # ✅ SEMPRE usar timestamp do servidor - NUNCA do dispositivo
+            server_timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            if command_type == "GTFRI":
+                if len(command_parts) > 13:
+                    vehicle_data = {
+                        'imei': command_parts[2],
+                        'speed': command_parts[8],
+                        'altitude': command_parts[10],
+                        'longitude': command_parts[11],
+                        'latitude': command_parts[12],
+                        'device_timestamp': command_parts[13],  # Apenas para referência
+                        'server_timestamp': server_timestamp,  # ✅ Data do SERVIDOR
+                        'raw_message': '+RESP:' + ','.join(command_parts)
+                    }
+                    
+                    # Log separando timestamps
+                    logger.debug(f"GTFRI - IMEI: {vehicle_data['imei']} | Server Time: {server_timestamp} | Device Time: {command_parts[13]}")
+```
+
+### Aplicar a mesma lógica para:
+- `GTIGN` e `GTIGF`
+- `GTSTT` 
+- `process_buff_message()`
+
+Sempre usando:
+- `server_timestamp` para salvar no banco
+- `device_timestamp` apenas para logs/referência
+
+---
+
+## 📊 Resultado Esperado
+
+### Logs corrigidos:
+```
+GTSTT - IMEI: 865083030086961 | Server Time: 2025-01-26 18:30:45 | Device Time: 20250726143045 | State: 41 (Sensor Rest)
+📱 Device State Change: IMEI 865083030086961 -> Sensor Rest [Server: 2025-01-26 18:30:45]
+
+Saved vehicle data for IMEI: 865083030086961 - Server Time: 2025-01-26 18:30:45 - Device Time: 20250726143045
+```
+
+### Estrutura no banco:
+```json
+{
+  "imei": "865083030086961",
+  "timestamp": "2025-01-26T18:30:45.123Z",     // ✅ SERVIDOR
+  "systemDate": "2025-01-26T18:30:45.123Z",   // ✅ SERVIDOR  
+  "deviceTimestamp": "20250726143045",         // ❓ DISPOSITIVO (referência)
+  "longitude": "-46.778597",
+  "latitude": "-23.5"
+}
+```
+
+---
+
+## 🎯 Instruções para o Replit
+
+1. **Faça backup** dos arquivos atuais
+2. **Aplique as alterações** nos 3 arquivos mencionados
+3. **Teste** com uma mensagem do dispositivo
+4. **Verifique** se os logs mostram timestamps separados
+5. **Confirme** no banco que `timestamp` e `systemDate` são do servidor
+6. **Valide** que `deviceTimestamp` é apenas string para referência
+
+## ✅ Validação Final
+
+Após as alterações, você deve ver:
+- ✅ Timestamps do servidor sempre atuais (UTC)
+- ✅ Timestamps do dispositivo apenas como referência
+- ✅ Logs separando claramente as duas datas
+- ✅ Consistência temporal nos dados do banco
+- ✅ Auditoria correta de quando o servidor recebeu vs quando o dispositivo enviou
