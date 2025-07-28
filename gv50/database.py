@@ -88,12 +88,15 @@ class DatabaseManager:
             return False
     
     def get_vehicle_by_imei(self, imei: str) -> Optional[Dict[str, Any]]:
-        """Get vehicle information by IMEI"""
+        """Get vehicle information by IMEI - search both imei and IMEI fields"""
         try:
             if self.db is None:
                 return None
             collection = self.db['vehicles']
-            vehicle = collection.find_one({'IMEI': imei})
+            # Try both field names for compatibility
+            vehicle = collection.find_one({'imei': imei})
+            if not vehicle:
+                vehicle = collection.find_one({'IMEI': imei})
             logger.debug(f"Retrieved vehicle for IMEI: {imei}")
             return vehicle
         except Exception as e:
