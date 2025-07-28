@@ -66,22 +66,32 @@ class DatabaseManager:
             return False
     
     def upsert_vehicle(self, vehicle: Vehicle) -> bool:
-        """Update or insert vehicle information"""
+        """Update or insert vehicle information - handles both imei and IMEI fields"""
         try:
             if self.db is None:
                 return False
             collection = self.db['vehicles']
-            filter_query = {'IMEI': vehicle.IMEI}  # Usar novo campo IMEI
+            
+            # Try to find existing vehicle with either field name
+            existing = collection.find_one({'imei': vehicle.IMEI})
+            if not existing:
+                existing = collection.find_one({'IMEI': vehicle.IMEI})
+            
             update_data = vehicle.to_dict()
             
-            result = collection.update_one(
-                filter_query,
-                {'$set': update_data},
-                upsert=True
-            )
+            if existing:
+                # Update existing document using its _id
+                result = collection.update_one(
+                    {'_id': existing['_id']},
+                    {'$set': update_data}
+                )
+                operation = 'UPDATE'
+            else:
+                # Insert new document
+                result = collection.insert_one(update_data)
+                operation = 'INSERT'
             
-            operation = 'UPDATE' if result.matched_count > 0 else 'INSERT'
-            logger.debug(f"Upserted vehicle for IMEI: {vehicle.IMEI}")
+            logger.debug(f"{operation} vehicle for IMEI: {vehicle.IMEI}")
             return True
         except Exception as e:
             logger.error(f"Error upserting vehicle for IMEI {vehicle.IMEI}: {e}")

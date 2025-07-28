@@ -105,6 +105,12 @@ class MessageHandler:
                         del vehicle_data['_id']
                     vehicle_data['ignicao'] = True
                     vehicle_data['tsusermanu'] = datetime.utcnow()
+                    
+                    # Fix field name compatibility
+                    if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
+                        vehicle_data['IMEI'] = vehicle_data['imei']
+                        del vehicle_data['imei']
+                    
                     updated_vehicle = Vehicle(**vehicle_data)
                     db_manager.upsert_vehicle(updated_vehicle)
                     logger.debug(f"Ignition ON updated for IMEI: {imei}")
@@ -116,12 +122,77 @@ class MessageHandler:
                         del vehicle_data['_id']
                     vehicle_data['ignicao'] = False
                     vehicle_data['tsusermanu'] = datetime.utcnow()
+                    
+                    # Fix field name compatibility
+                    if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
+                        vehicle_data['IMEI'] = vehicle_data['imei']
+                        del vehicle_data['imei']
+                    
                     updated_vehicle = Vehicle(**vehicle_data)
                     db_manager.upsert_vehicle(updated_vehicle)
                     logger.debug(f"Ignition OFF updated for IMEI: {imei}")
+            
+            # Process ACK responses for command confirmation
+            elif report_type == 'GTOUT' and parsed_data.get('msg_type') == 'ACK':
+                self._process_gtout_ack(imei, parsed_data, raw_message)
                     
         except Exception as e:
             logger.error(f"Error updating vehicle: {e}")
+    
+    def _process_gtout_ack(self, imei: str, parsed_data: Dict[str, Any], raw_message: str):
+        """Process GTOUT ACK response to update blocking status"""
+        try:
+            # Check if this is a successful ACK (status 0001, 0002, or 0003)
+            status = parsed_data.get('status', '')
+            if status in ['0001', '0002', '0003']:  # Successful command execution
+                
+                vehicle = db_manager.get_vehicle_by_imei(imei)
+                if vehicle:
+                    vehicle_data = dict(vehicle)
+                    if '_id' in vehicle_data:
+                        del vehicle_data['_id']
+                    
+                    # Check what type of command was pending to determine the result
+                    current_command = vehicle_data.get('comandobloqueo')
+                    if current_command is True:
+                        # This was a blocking command confirmation
+                        vehicle_data['bloqueado'] = True
+                        vehicle_data['comandobloqueo'] = None  # Clear pending command
+                        logger.info(f"✅ Bloqueio confirmado para IMEI {imei} - Status: {status}")
+                    elif current_command is False:
+                        # This was an unblocking command confirmation
+                        vehicle_data['bloqueado'] = False
+                        vehicle_data['comandobloqueo'] = None  # Clear pending command
+                        logger.info(f"✅ Desbloqueio confirmado para IMEI {imei} - Status: {status}")
+                    else:
+                        # Fallback: try to determine from ACK message content
+                        # Look for status field in GTOUT ACK which indicates result
+                        if parsed_data.get('blocked', False):  # From GTOUT parser
+                            vehicle_data['bloqueado'] = True
+                            logger.info(f"✅ Bloqueio confirmado (ACK) para IMEI {imei} - Status: {status}")
+                        else:
+                            vehicle_data['bloqueado'] = False
+                            logger.info(f"✅ Desbloqueio confirmado (ACK) para IMEI {imei} - Status: {status}")
+                        vehicle_data['comandobloqueo'] = None
+                    
+                    vehicle_data['tsusermanu'] = datetime.utcnow()
+                    
+                    # Fix field name compatibility - Vehicle model expects IMEI (uppercase)
+                    if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
+                        vehicle_data['IMEI'] = vehicle_data['imei']
+                        del vehicle_data['imei']
+                    
+                    from models import Vehicle
+                    updated_vehicle = Vehicle(**vehicle_data)
+                    db_manager.upsert_vehicle(updated_vehicle)
+                    
+            else:
+                logger.warning(f"GTOUT command failed for IMEI {imei} - Status: {status}")
+                
+        except Exception as e:
+            logger.error(f"Error processing GTOUT ACK for IMEI {imei}: {e}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
     
     # Command execution removed - now handled exclusively by TCP server
 

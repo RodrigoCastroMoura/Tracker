@@ -193,6 +193,12 @@ class GV50TCPServer:
                     vehicle_data['comandotrocarip'] = False
                 
                 vehicle_data['tsusermanu'] = datetime.utcnow()
+                
+                # Fix field name compatibility - Vehicle model expects IMEI (uppercase)
+                if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
+                    vehicle_data['IMEI'] = vehicle_data['imei']
+                    del vehicle_data['imei']
+                
                 updated_vehicle = Vehicle(**vehicle_data)
                 db_manager.upsert_vehicle(updated_vehicle)
                 

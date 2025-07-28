@@ -113,6 +113,9 @@ Preferred communication style: Simple, everyday language.
 ✓ ERRO COMANDO BLOQUEIO CORRIGIDO: Removida lógica duplicada do message_handler.py
 ✓ Sistema de comandos unificado: Apenas tcp_server.py executa comandos GTOUT/GTSRI
 ✓ Correção definitiva: 'str' object has no attribute 'send' eliminado
+✓ STATUS DE BLOQUEIO IMPLEMENTADO: Processamento de ACK GTOUT para atualizar status bloqueado
+✓ Compatibilidade de campos corrigida: IMEI maiúsculo/minúsculo resolvido em todos os contextos
+✓ Sistema completo: Comando enviado → ACK recebido → Status atualizado automaticamente
 
 ## System Architecture
 
