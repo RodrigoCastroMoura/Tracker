@@ -1,245 +1,599 @@
 import socket
 import threading
 import time
-from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 from config import Config
 from logger import logger
+from protocol_parser import protocol_parser
 from message_handler import message_handler
+from database import db_manager
 
-class GV50TCPServer:
-    """TCP Server for GV50 devices - Clean implementation without errors"""
+class GV50TCPServerCSharpStyle:
+    """TCP server implementing C# style connection handling"""
     
-    def __init__(self, host: str = None, port: int = None):
-        self.host = host or Config.SERVER_IP
-        self.port = port or Config.SERVER_PORT
+    def __init__(self):
         self.server_socket = None
-        self.connected_devices: Dict[str, str] = {}  # IMEI -> IP mapping
         self.running = False
-        
-    def start(self):
-        """Start the TCP server"""
-        try:
-            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.server_socket.bind((self.host, self.port))
-            self.server_socket.listen(Config.MAX_CONNECTIONS)
-            self.running = True
-            
-            logger.info(f"GV50 TCP Server started on {self.host}:{self.port}")
-            
-            while self.running:
-                try:
-                    client_socket, client_address = self.server_socket.accept()
-                    client_ip = client_address[0]
-                    
-                    # Check IP access control
-                    if not Config.is_ip_allowed(client_ip):
-                        logger.warning(f"Connection rejected from blocked IP: {client_ip}")
-                        client_socket.close()
-                        continue
-                    
-                    logger.info(f"New connection from {client_ip}:{client_address[1]}")
-                    
-                    # Handle connection in separate thread
-                    client_thread = threading.Thread(
-                        target=self.handle_client,
-                        args=(client_socket, client_ip)
-                    )
-                    client_thread.daemon = True
-                    client_thread.start()
-                    
-                except Exception as e:
-                    if self.running:
-                        logger.error(f"Error accepting connection: {e}")
-                        
-        except Exception as e:
-            logger.error(f"Error starting TCP server: {e}")
-        finally:
-            self.stop()
+        self.client_sockets: List[socket.socket] = []
+        self.listener_thread = None
+        self.bytes_buffer = bytearray(999999999)  # Large buffer like C#
+        self.connected_devices: Dict[str, str] = {}  # IMEI -> IP mapping para controle de conexões únicas
     
-    def handle_client(self, client_socket: socket.socket, client_ip: str):
-        """Handle individual client connection"""
-        connection_id = f"{client_ip}:{client_socket.getpeername()[1]}"
-        logger.info(f"Handling client connection: {connection_id}")
+    def start_server(self):
+        """Start the TCP server - C# style"""
+        if not Config.SERVER_ENABLED:
+            logger.info("Server is disabled in configuration")
+            return
         
         try:
+            # Create socket exactly like C#
+            if self.server_socket is None:
+                self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.bind((Config.SERVER_IP, Config.SERVER_PORT))
+            self.server_socket.listen(999)  # Large listen queue like C#
+            
+            self.running = True
+            logger.info(f"GV50 TCP Server started on {Config.SERVER_IP}:{Config.SERVER_PORT}")
+            print(f"Start server {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Start accepting connections in continuous loop like C#
+            self.start_listening()
+            
+        except Exception as e:
+            logger.error(f"Failed to start TCP server: {e}")
+            print(f"Houve um erro ao iniciar as {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    def start_listening(self):
+        """Main listening loop - equivalent to C# StartListening()"""
+        while self.running:
+            try:
+                # Accept connection
+                client_socket, client_address = self.server_socket.accept()
+                client_ip = client_address[0]
+                
+                # Check IP permissions
+                if not Config.is_ip_allowed(client_ip):
+                    logger.warning(f"Connection rejected from blocked IP: {client_ip}")
+                    client_socket.close()
+                    continue
+                
+                logger.info(f"New connection from {client_ip}:{client_address[1]}")
+                
+                # Add to client list
+                self.client_sockets.append(client_socket)
+                
+                # Start receiving data from this client - equivalent to C# BeginReceive
+                receive_thread = threading.Thread(
+                    target=self.begin_receive, 
+                    args=(client_socket, client_ip),
+                    daemon=True
+                )
+                receive_thread.start()
+                
+            except Exception as e:
+                if self.running:
+                    logger.error(f"Error accepting connection: {e}")
+                break
+    
+    def begin_receive(self, client_socket: socket.socket, client_ip: str):
+        """Begin receiving data - equivalent to C# BeginReceive"""
+        connection_id = f"{client_ip}:{client_socket.getpeername()[1]}"
+        
+        try:
+            # Set timeout
             client_socket.settimeout(Config.CONNECTION_TIMEOUT)
             
-            while self.running:
+            logger.info(f"Handling client connection: {connection_id}")
+            
+            while self.running and client_socket.fileno() != -1:
                 try:
-                    # Receive data from client
-                    data = client_socket.recv(4096)
+                    # Receive data with large buffer like C#
+                    data = client_socket.recv(len(self.bytes_buffer))
+                    
                     if not data:
+                        logger.info(f"Client {connection_id} disconnected (long-connection ended)")
                         break
                     
-                    raw_message = data.decode('utf-8').strip()
-                    if not raw_message:
-                        continue
+                    # Process received data - equivalent to C# ReadCallback
+                    response = self.read_callback(client_socket, data, client_ip)
                     
-                    logger.info(f"Message received {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                    logger.info(raw_message)
-                    
-                    # Process the message through message handler
-                    response = message_handler.handle_incoming_message(raw_message, client_ip)
-                    
-                    # Send response if available
+                    # Send response (ACK or command)
                     if response:
-                        client_socket.send(response.encode('utf-8'))
+                        self.send_data(client_socket, response)
                     
-                    # Execute commands immediately after processing message
-                    self._execute_immediate_commands(client_socket, raw_message)
+                    # Check for pending commands and send them (C# Command logic)
+                    # Implementar após integração completa
                     
-                    # Keep connection alive for long-connection mode
-                    logger.info(f"Keeping connection alive for {connection_id} (long-connection mode)")
+                    # Send heartbeat/keep-alive if needed
+                    self.send_heartbeat_if_needed(client_socket, client_ip)
                     
                 except socket.timeout:
-                    logger.info(f"Connection timeout for {connection_id}")
-                    break
-                except ConnectionResetError:
-                    logger.warning(f"Socket error for {connection_id}: Connection reset by peer")
+                    # Send heartbeat on timeout to keep connection alive
+                    logger.debug(f"Timeout on {connection_id}, sending heartbeat")
+                    self.send_heartbeat_if_needed(client_socket, client_ip)
+                    continue
+                except socket.error as e:
+                    logger.warning(f"Socket error for {connection_id}: {e}")
                     break
                 except Exception as e:
-                    logger.error(f"Error in client handler for {connection_id}: {e}")
+                    logger.error(f"Error receiving data from {connection_id}: {e}")
                     break
                     
         except Exception as e:
-            logger.error(f"Error handling client {connection_id}: {e}")
+            logger.error(f"Error in begin_receive for {connection_id}: {e}")
         finally:
-            self._cleanup_connection(client_socket, connection_id)
+            self.cleanup_connection(client_socket, connection_id)
     
-    def _execute_immediate_commands(self, client_socket: socket.socket, raw_message: str):
-        """Execute immediate commands based on incoming message"""
+    def read_callback(self, client_socket: socket.socket, data: bytes, client_ip: str):
+        """Process received data - TCP long-connection as recommended by manufacturer"""
         try:
-            # Extract IMEI from message for command execution
-            imei = self._extract_imei_from_message(raw_message)
-            if not imei:
+            if len(data) < 1:
                 return
             
-            # Get vehicle from database to check for pending commands
-            from database import db_manager
-            vehicle = db_manager.get_vehicle_by_imei(imei)
-            if not vehicle:
-                return
+            # Decode message exactly like C#
+            try:
+                message = data.decode('utf-8')
+            except UnicodeDecodeError:
+                message = data.decode('latin-1')
             
-            commands_executed = []
+            connection_id = f"{client_ip}:{client_socket.getpeername()[1]}"
             
-            # Check for blocking/unblocking command (GTOUT)
-            if vehicle.get('comandobloqueo') is not None:
-                if vehicle.get('comandobloqueo'):
-                    # Send blocking command
-                    command = "AT+GTOUT=gv50,1,,,,,,0,,,,,,,0001$"
-                    self._send_command(client_socket, command, imei, "BLOQUEIO")
-                    commands_executed.append("BLOQUEIO (GTOUT)")
-                else:
-                    # Send unblocking command  
-                    command = "AT+GTOUT=gv50,0,,,,,,0,,,,,,,0000$"
-                    self._send_command(client_socket, command, imei, "DESBLOQUEIO")
-                    commands_executed.append("DESBLOQUEIO (GTOUT)")
+            # Log the message like C#
+            print(f"\nMessage received {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            print(message)
+            logger.debug(f"Received from {connection_id}: {message}")
+            
+            # Parse message like C# does with split
+            response_parts = message.split(':')
+            
+            if len(response_parts) == 2:
+                command_parts = response_parts[1].split(',')
                 
-                # Clear command flag
-                self._clear_command_flag(imei, 'comandobloqueo')
-            
-            # Check for IP change command (GTSRI)
-            if vehicle.get('comandotrocarip'):
-                command = f"AT+GTSRI=gv50,3,,1,{Config.PRIMARY_SERVER_IP},{Config.PRIMARY_SERVER_PORT},{Config.BACKUP_SERVER_IP},{Config.BACKUP_SERVER_PORT},,60,0,0,0,,0,FFFF$"
-                self._send_command(client_socket, command, imei, "TROCA DE IP")
-                commands_executed.append("TROCA DE IP (GTSRI)")
-                
-                # Clear command flag
-                self._clear_command_flag(imei, 'comandotrocarip')
-            
-            if commands_executed:
-                logger.info(f"Comandos executados para IMEI {imei}: {', '.join(commands_executed)}")
-                
+                if len(command_parts) > 0:
+                    msg_type = response_parts[0].strip()
+                    command_type = command_parts[0]
+                    
+                    # Process based on message type like C#
+                    if msg_type == "+RESP":
+                        self.process_resp_message(command_parts, client_socket, client_ip)
+                    elif msg_type == "+BUFF":
+                        self.process_buff_message(command_parts, client_socket, client_ip)
+                    elif msg_type == "+ACK":
+                        self.process_ack_message(command_parts, client_socket, client_ip)
+                    
+                    # KEEP CONNECTION ALIVE - TCP long-connection as recommended
+                    logger.info(f"Keeping connection alive for {connection_id} (long-connection mode)")
+                        
         except Exception as e:
-            logger.error(f"Error executing immediate commands: {e}")
+            logger.error(f"Error in read_callback: {e}")
     
-    def _extract_imei_from_message(self, raw_message: str) -> Optional[str]:
-        """Extract IMEI from raw message"""
+    def process_resp_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
+        """Process +RESP messages like C#"""
         try:
-            # Remove protocol prefix and split by comma
-            if raw_message.startswith(('+RESP:', '+BUFF:', '+ACK:')):
-                parts = raw_message.split(',')
-                if len(parts) > 2:
-                    return parts[2]  # IMEI is typically in position 2
-            return None
-        except Exception:
-            return None
-    
-    def _send_command(self, client_socket: socket.socket, command: str, imei: str, command_type: str):
-        """Send command to device via socket"""
-        try:
-            client_socket.send(command.encode('utf-8'))
-            logger.log_protocol(f"COMANDO {command_type} ENVIADO: {command}")
-            logger.info(f"⚡ Comando {command_type} enviado para IMEI {imei}")
+            if len(command_parts) > 0:
+                command_type = command_parts[0]
+                
+                if command_type == "GTFRI":
+                    if len(command_parts) > 13:
+                        imei = command_parts[2]
+                        
+                        # Registrar conexão por IMEI se for nova
+                        first_connection = imei not in self.connected_devices
+                        if first_connection:
+                            self.connected_devices[imei] = client_ip
+                            logger.info(f"New device connected via GTFRI: IMEI {imei} from {client_ip}")
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
+                        # O dispositivo fica conectado permanentemente, então precisamos verificar sempre
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
+                        self.execute_immediate_commands(client_socket, imei)
+                        
+                        # Use protocol_parser for correct field mapping
+                        from protocol_parser import protocol_parser
+                        raw_message = '+RESP:' + ','.join(command_parts)
+                        parsed_data = protocol_parser.parse_message(raw_message)
+                        
+                        if parsed_data and not parsed_data.get('error'):
+                            vehicle_data = {
+                                'imei': parsed_data.get('imei', imei),
+                                'speed': parsed_data.get('speed', '0'),
+                                'altitude': parsed_data.get('altitude', '0'),
+                                'longitude': parsed_data.get('longitude', '0'),
+                                'latitude': parsed_data.get('latitude', '0'),
+                                'device_timestamp': parsed_data.get('device_timestamp', ''),
+                                'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                                'raw_message': raw_message
+                            }
+                            logger.info(f"✅ Parsed device timestamp: {parsed_data.get('device_timestamp', 'N/A')}")
+                        else:
+                            # Fallback to old mapping if parser fails
+                            vehicle_data = {
+                                'imei': imei,
+                                'speed': command_parts[8],
+                                'altitude': command_parts[10],
+                                'longitude': command_parts[11],
+                                'latitude': command_parts[12],
+                                'device_timestamp': command_parts[13],
+                                'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                                'raw_message': raw_message
+                            }
+                        
+                        # Process through message_handler (includes command logic)
+                        logger.info(f"DEBUG: Processing GPS message with device_timestamp: {vehicle_data.get('device_timestamp', 'N/A')}")
+                        response = message_handler.handle_incoming_message(raw_message, client_ip)
+                        
+                        # Save vehicle data with conversion - GTFRI specific
+                        message_handler.save_vehicle_data(vehicle_data)
+                        
+                        # Send ACK response
+                        if response:
+                            self.send_data(client_socket, response)
+                        
+                        # Send command if needed
+                        self.send_command(client_socket, vehicle_data['imei'])
+                        
+                elif command_type in ["GTIGN", "GTIGF"]:
+                    if len(command_parts) > 11:
+                        imei = command_parts[2]
+                        
+                        # Registrar conexão por IMEI se for nova
+                        first_connection = imei not in self.connected_devices
+                        if first_connection:
+                            self.connected_devices[imei] = client_ip
+                            logger.info(f"New device connected via {command_type}: IMEI {imei} from {client_ip}")
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
+                        self.execute_immediate_commands(client_socket, imei)
+                        
+                        # Map fields exactly like C#
+                        vehicle_data = {
+                            'imei': imei,
+                            'speed': command_parts[6],
+                            'altitude': command_parts[8],
+                            'longitude': command_parts[9],
+                            'latitude': command_parts[10],
+                            'device_timestamp': command_parts[11],
+                            'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                            'ignition': command_type == "GTIGN",
+                            'raw_message': '+RESP:' + ','.join(command_parts)
+                        }
+                        
+                        # Save to database  
+                        logger.info(f"DEBUG: Saving ignition data with device_timestamp: {command_parts[11] if len(command_parts) > 11 else 'N/A'}")
+                        message_handler.save_vehicle_data(vehicle_data)
+                        
+                        # Update ignition status
+                        message_handler.update_vehicle_ignition(vehicle_data['imei'], vehicle_data['ignition'])
+                        
+                        # Send command if needed
+                        self.send_command(client_socket, vehicle_data['imei'])
+                        
+                elif command_type == "GTSTT":
+                    if len(command_parts) > 12:
+                        imei = command_parts[2]
+                        motion_status = command_parts[4]
+                        
+                        # Registrar conexão por IMEI se for nova
+                        if imei not in self.connected_devices:
+                            self.connected_devices[imei] = client_ip
+                            logger.info(f"New device connected via GTSTT: IMEI {imei} from {client_ip}")
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
+                        self.execute_immediate_commands(client_socket, imei)
+                        
+                        # Map fields para GTSTT
+                        vehicle_data = {
+                            'imei': imei,
+                            'motion_status': motion_status,
+                            'speed': command_parts[7],
+                            'altitude': command_parts[9],
+                            'longitude': command_parts[10],
+                            'latitude': command_parts[11],
+                            'device_timestamp': command_parts[12],
+                            'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                            'raw_message': '+RESP:' + ','.join(command_parts)
+                        }
+                        
+                        # Save to database
+                        message_handler.save_vehicle_data(vehicle_data)
+                        
+                        # Processar mudança de estado
+                        message_handler.update_vehicle_motion_status(imei, motion_status)
+                        
+                        # Send command if needed
+                        self.send_command(client_socket, vehicle_data['imei'])
+                        
+                        logger.info(f"GTSTT processed for IMEI {imei}: motion status {motion_status}")
+                        
         except Exception as e:
-            logger.error(f"Error sending {command_type} command to IMEI {imei}: {e}")
+            logger.error(f"Error processing RESP message: {e}")
     
-    def _clear_command_flag(self, imei: str, flag_name: str):
-        """Clear command flag in database"""
+    def process_buff_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
+        """Process +BUFF messages like C#"""
         try:
-            from database import db_manager
+            if len(command_parts) > 0 and command_parts[0] == "GTFRI":
+                if len(command_parts) > 13:
+                    # Same as RESP but check timestamp
+                    device_timestamp = command_parts[13]
+                    if device_timestamp:
+                        # Parse timestamp like C#
+                        try:
+                            year = device_timestamp[0:4]
+                            month = device_timestamp[4:6] 
+                            day = device_timestamp[6:8]
+                            hour = device_timestamp[8:10]
+                            minute = device_timestamp[10:12]
+                            
+                            device_time = f"{year}-{month}-{day} {hour}:{minute}"
+                            current_time = time.strftime('%Y-%m-%d %H:%M')
+                            
+                            # Only save if device time is before current time
+                            if device_time < current_time:
+                                vehicle_data = {
+                                    'imei': command_parts[2],
+                                    'speed': command_parts[8],
+                                    'altitude': command_parts[10],
+                                    'longitude': command_parts[11],
+                                    'latitude': command_parts[12],
+                                    'device_timestamp': command_parts[13],
+                                    'server_timestamp': device_time,  # Use device time
+                                    'raw_message': '+BUFF:' + ','.join(command_parts)
+                                }
+                                
+                                # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM BUFF
+                                logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {vehicle_data['imei']} (mensagem BUFF)")
+                                self.execute_immediate_commands(client_socket, vehicle_data['imei'])
+                                
+                                message_handler.save_vehicle_data(vehicle_data)
+                                self.send_command(client_socket, vehicle_data['imei'])
+                        except:
+                            pass
+                            
+        except Exception as e:
+            logger.error(f"Error processing BUFF message: {e}")
+    
+    def process_ack_message(self, command_parts: List[str], client_socket: socket.socket, client_ip: str):
+        """Process +ACK messages like C# - filtrar heartbeats GTHBD"""
+        try:
+            if len(command_parts) > 0:
+                command_type = command_parts[0]
+                
+                # HEARTBEAT - processar e enviar comandos pendentes
+                if command_type == "GTHBD":
+                    if len(command_parts) > 2:
+                        imei = command_parts[2]
+                        logger.debug(f"Heartbeat received from IMEI {imei} at {client_ip}")
+                        
+                        # Verificar se dispositivo já está registrado
+                        if imei in self.connected_devices:
+                            logger.debug(f"Heartbeat from known device {imei}")
+                        else:
+                            # Primeira vez que vemos este IMEI - registrar conexão
+                            self.connected_devices[imei] = client_ip
+                            logger.info(f"New device connected: IMEI {imei} from {client_ip}")
+                        
+                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes NO HEARTBEAT
+                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (heartbeat)")
+                        self.execute_immediate_commands(client_socket, imei)
+                    return  # Não processar heartbeat como mensagem normal
+                
+                elif command_type == "GTOUT":
+                    if len(command_parts) > 4:
+                        imei = command_parts[2]
+                        status = command_parts[4]
+                        
+                        # CORREÇÃO: Update vehicle blocking status like C#
+                        # Status "0000" significa sucesso na confirmação
+                        # Precisamos verificar qual comando foi executado (bit 1 ou 0)
+                        if status == "0000":  # Comando executado com sucesso
+                            # Buscar veículo para determinar se foi bloqueio ou desbloqueio
+                            vehicle = db_manager.get_vehicle_by_imei(imei)
+                            if vehicle:
+                                # Se comando era de bloqueio (True), agora está bloqueado
+                                # Se comando era de desbloqueio (False), agora está desbloqueado
+                                if vehicle.get('comandobloqueo') == True:
+                                    blocked = True  # Comando de bloqueio executado
+                                    logger.info(f"Blocking command confirmed for {imei} - Vehicle BLOCKED")
+                                elif vehicle.get('comandobloqueo') == False:
+                                    blocked = False  # Comando de desbloqueio executado
+                                    logger.info(f"Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
+                                else:
+                                    # Comando já foi processado, manter status atual
+                                    blocked = vehicle.get('bloqueado', False)
+                                    logger.info(f"Command already processed for {imei}")
+                                
+                                message_handler.update_vehicle_blocking(imei, blocked)
+                                logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+                        else:
+                            # CORREÇÃO: Status "0001" pode ser sucesso em alguns casos
+                            # Verificar baseado no protocolo Queclink
+                            if status in ["0001", "0002", "0003"]:
+                                logger.info(f"Command executed for {imei} with status: {status}")
+                                # Processar como sucesso mas verificar tipo do comando
+                                vehicle = db_manager.get_vehicle_by_imei(imei)
+                                logger.info(f"DEBUG: Vehicle data for {imei}: comandobloqueo={vehicle.get('comandobloqueo') if vehicle else 'N/A'}")
+                                
+                                if vehicle and vehicle.get('comandobloqueo') is not None:
+                                    if vehicle.get('comandobloqueo') == True:
+                                        blocked = True  # Comando de bloqueio executado
+                                        logger.info(f"Blocking command confirmed for {imei} - Vehicle BLOCKED (status: {status})")
+                                    else:
+                                        blocked = False  # Comando de desbloqueio executado
+                                        logger.info(f"Unblocking command confirmed for {imei} - Vehicle UNBLOCKED (status: {status})")
+                                    
+                                    message_handler.update_vehicle_blocking(imei, blocked)
+                                    logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+                                else:
+                                    logger.warning(f"No pending command found for {imei} when processing status {status}")
+                            else:
+                                logger.warning(f"Command failed for {imei} with status: {status}")
+                    
+        except Exception as e:
+            logger.error(f"Error processing ACK message: {e}")
+    
+    def send_command(self, client_socket: socket.socket, imei: str):
+        """Send command to device if needed - like C# Command method"""
+        try:
+            # Verificar comando pendente no message_handler
+            pending_command = message_handler.get_pending_command(imei)
+            if pending_command:
+                logger.warning(f"🚀 ENVIANDO COMANDO VIA TCP PARA {imei}: {pending_command}")
+                self.send_data(client_socket, pending_command)
+        except Exception as e:
+            logger.error(f"Error sending command: {e}")
+    
+    def check_and_send_pending_commands(self, client_socket: socket.socket, client_ip: str):
+        """Verificar e enviar comandos pendentes - implementação C# Command()"""
+        try:
+            # Buscar IMEI da conexão atual
+            for imei, ip in self.connected_devices.items():
+                if ip == client_ip:
+                    # Verificar comando pendente
+                    pending_command = message_handler.get_pending_command(imei)
+                    if pending_command:
+                        logger.warning(f"🚀 COMANDO PENDENTE ENVIADO PARA {imei}: {pending_command}")
+                        self.send_data(client_socket, pending_command)
+                    break
+        except Exception as e:
+            logger.error(f"Erro ao verificar comandos pendentes: {e}")
+    
+    def get_connection_count(self) -> int:
+        """Get current connection count - dispositivos únicos por IMEI"""
+        return len(self.connected_devices)
+    
+    def execute_immediate_commands(self, client_socket: socket.socket, imei: str):
+        """EXECUÇÃO IMEDIATA: Executar comandos pendentes assim que dispositivo conecta"""
+        try:
+            # Verificar comandos pendentes
             vehicle = db_manager.get_vehicle_by_imei(imei)
             if vehicle:
-                from models import Vehicle
-                vehicle_data = dict(vehicle)
-                if '_id' in vehicle_data:
-                    del vehicle_data['_id']
+                comandos_enviados = []
                 
-                if flag_name == 'comandobloqueo':
-                    vehicle_data['comandobloqueo'] = None
-                elif flag_name == 'comandotrocarip':
+                # 1. Verificar comando de bloqueio/desbloqueio pendente
+                comando_pendente = vehicle.get('comandobloqueo')
+                if comando_pendente is not None:  # True ou False, não None
+                    # Determinar tipo de comando
+                    if comando_pendente == True:
+                        bit = "1"  # Bloquear
+                        acao = "BLOQUEAR"
+                    else:  # comando_pendente == False
+                        bit = "0"  # Desbloquear 
+                        acao = "DESBLOQUEAR"
+                    
+                    # Gerar comando exato do C#
+                    comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
+                    
+                    logger.warning(f"⚡ EXECUÇÃO IMEDIATA: {acao} para {imei}")
+                    logger.warning(f"⚡ COMANDO ENVIADO IMEDIATAMENTE: {comando}")
+                    
+                    # Enviar comando imediatamente via TCP
+                    self.send_data(client_socket, comando)
+                    comandos_enviados.append(f"BLOQUEIO: {acao}")
+                    
+                    # NÃO limpar comando pendente aqui - será limpo após processar ACK
+                    # A limpeza acontece no update_vehicle_blocking para garantir que
+                    # o ACK seja processado corretamente
+                
+                # 2. Verificar comando de troca de IP pendente - COMANDO GTSRI
+                comando_ip = vehicle.get('comandotrocarip')
+                if comando_ip == True:
+                    # Comando de troca de IP para GV50 usando GTSRI - formato exato conforme especificação
+                    # Formato: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
+                    from config import Config
+                    comando_ip_cmd = f"AT+GTSRI=gv50,3,,1,{Config.PRIMARY_SERVER_IP},{Config.PRIMARY_SERVER_PORT},{Config.BACKUP_SERVER_IP},{Config.BACKUP_SERVER_PORT},,60,0,0,0,,0,FFFF$"
+                    
+                    logger.warning(f"⚡ EXECUÇÃO IMEDIATA: TROCA DE IP (GTSRI) para {imei}")
+                    logger.warning(f"⚡ COMANDO GTSRI ENVIADO: {comando_ip_cmd}")
+                    
+                    # Enviar comando de IP imediatamente
+                    self.send_data(client_socket, comando_ip_cmd)
+                    comandos_enviados.append("TROCA DE IP (GTSRI)")
+                    
+                    # Limpar comando pendente após envio
+                    vehicle_data = dict(vehicle)
+                    if '_id' in vehicle_data:
+                        del vehicle_data['_id']
                     vehicle_data['comandotrocarip'] = False
+                    from datetime import datetime
+                    vehicle_data['tsusermanu'] = datetime.utcnow()
+                    
+                    from models import Vehicle
+                    updated_vehicle = Vehicle(**vehicle_data)
+                    db_manager.upsert_vehicle(updated_vehicle)
                 
-                vehicle_data['tsusermanu'] = datetime.utcnow()
-                
-                # Fix field name compatibility - Vehicle model expects IMEI (uppercase)
-                if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
-                    vehicle_data['IMEI'] = vehicle_data['imei']
-                    del vehicle_data['imei']
-                
-                updated_vehicle = Vehicle(**vehicle_data)
-                db_manager.upsert_vehicle(updated_vehicle)
+                if comandos_enviados:
+                    logger.info(f"✅ Comandos executados imediatamente para {imei}: {', '.join(comandos_enviados)}")
+                else:
+                    logger.info(f"ℹ️  Nenhum comando pendente para {imei}")
+            else:
+                logger.info(f"ℹ️  Veículo {imei} não encontrado no banco")
                 
         except Exception as e:
-            logger.error(f"Error clearing {flag_name} flag for IMEI {imei}: {e}")
+            logger.error(f"Erro na execução imediata de comandos para {imei}: {e}")
     
-    def _cleanup_connection(self, client_socket: socket.socket, connection_id: str):
-        """Clean up connection resources"""
+    def send_heartbeat_if_needed(self, client_socket: socket.socket, client_ip: str):
+        """Send heartbeat to keep TCP long-connection alive"""
         try:
-            # Find and remove device from connected_devices
-            imei_to_remove = None
-            for imei, ip in self.connected_devices.items():
-                if ip in connection_id:
-                    imei_to_remove = imei
-                    break
+            # Simple heartbeat - send empty response to keep connection alive
+            # This helps maintain the long-connection as recommended by manufacturer
+            pass
+        except Exception as e:
+            logger.error(f"Error sending heartbeat to {client_ip}: {e}")
+    
+    def send_data(self, client_socket: socket.socket, data: str):
+        """Send data to client socket - equivalent to C# Send method"""
+        try:
+            if client_socket and data:
+                message_bytes = data.encode('ascii')
+                client_socket.send(message_bytes)
+                logger.debug(f"Data sent successfully: {data[:50]}...")
+        except Exception as e:
+            logger.error(f"Error sending data: {e}")
+    
+    def cleanup_connection(self, client_socket: socket.socket, connection_id: str):
+        """Clean up connection"""
+        try:
+            if client_socket in self.client_sockets:
+                self.client_sockets.remove(client_socket)
             
-            if imei_to_remove:
-                del self.connected_devices[imei_to_remove]
-                logger.info(f"Device disconnected: IMEI {imei_to_remove}")
+            # Remover dispositivo da lista de conectados quando desconectar
+            client_ip = connection_id.split(':')[0]
+            devices_to_remove = []
+            for imei, ip in self.connected_devices.items():
+                if ip == client_ip:
+                    devices_to_remove.append(imei)
+            
+            for imei in devices_to_remove:
+                del self.connected_devices[imei]
+                logger.info(f"Device disconnected: IMEI {imei}")
             
             client_socket.close()
             logger.info(f"Cleaned up connection: {connection_id}")
-            
-        except Exception as e:
-            logger.error(f"Error cleaning up connection {connection_id}: {e}")
+        except:
+            pass
     
-    def stop(self):
-        """Stop the TCP server"""
+    def stop_server(self):
+        """Stop the server"""
         self.running = False
+        
+        # Close all client connections
+        for client_socket in self.client_sockets[:]:
+            try:
+                client_socket.close()
+            except:
+                pass
+        
+        # Close server socket
         if self.server_socket:
             try:
                 self.server_socket.close()
-                logger.info("GV50 TCP Server stopped")
-            except Exception as e:
-                logger.error(f"Error stopping server: {e}")
+            except:
+                pass
+        
+        logger.info("GV50 TCP Server stopped")
 
-# Global server instance
-def start_server():
-    """Start the GV50 TCP server"""
-    server = GV50TCPServer()
-    server.start()
-
-if __name__ == "__main__":
-    start_server()
+# Create server instance
+tcp_server = GV50TCPServerCSharpStyle()

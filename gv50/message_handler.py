@@ -7,17 +7,14 @@ from models import VehicleData, Vehicle
 from datetime_converter import convert_device_timestamp
 
 class MessageHandler:
-    """Handle parsed messages and update database - duas tabelas apenas"""
+    """Handle parsed messages and update database - apenas duas tabelas"""
     
     def __init__(self):
-        self.device_ips = {}  # Track IP addresses for IP change detection
+        self.device_ips = {}  # Track IP addresses for simple IP change detection
     
     def handle_incoming_message(self, raw_message: str, client_ip: str) -> Optional[str]:
         """Handle incoming GPS device message - simplified for 2 tables only"""
         try:
-            # Log incoming message if enabled
-            logger.log_incoming_message(client_ip, "parsing...", raw_message)
-            
             # Parse the raw message
             parsed_data = protocol_parser.parse_message(raw_message)
             
@@ -30,171 +27,334 @@ class MessageHandler:
                 logger.warning(f"No IMEI found in message from {client_ip}")
                 return None
             
-            # Log IP change detection
+            # Log basic IP change detection
             if imei in self.device_ips and self.device_ips[imei] != client_ip:
                 logger.info(f"IP change detected for IMEI {imei}: {self.device_ips[imei]} -> {client_ip}")
             self.device_ips[imei] = client_ip
             
-            # Save vehicle data to vehicle_data table
-            self.save_vehicle_data(parsed_data, raw_message)
-            
-            # Update vehicle information in vehicles table
-            self.update_vehicle(parsed_data, client_ip, raw_message)
-            
-            # Generate acknowledgment
-            response = protocol_parser.generate_acknowledgment(parsed_data)
-            if response:
-                logger.log_outgoing_message(client_ip, imei, response)
-            
-            # Command execution is now handled by TCP server directly
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error handling message from {client_ip}: {e}")
-            return None
-    
-    def save_vehicle_data(self, parsed_data: Dict[str, Any], raw_message: str):
-        """Save GPS data to vehicle_data table"""
-        try:
-            imei = parsed_data.get('imei', '')
+            # Create vehicle data record - apenas dados de localização
             current_time = datetime.utcnow()
             
-            # Convert device timestamp to datetime
+            # Converter device timestamp para datetime
             device_timestamp_str = parsed_data.get('device_timestamp', '')
-            device_datetime_converted = None
-            if device_timestamp_str and device_timestamp_str != '0000':
-                device_datetime_converted = convert_device_timestamp(device_timestamp_str)
+            device_datetime_converted = convert_device_timestamp(device_timestamp_str)
             
-            # Create vehicle data record
             vehicle_data = VehicleData(
                 imei=imei,
                 longitude=parsed_data.get('longitude'),
                 latitude=parsed_data.get('latitude'),
                 altitude=parsed_data.get('altitude'),
-                timestamp=current_time,  # Server timestamp
-                deviceTimestamp=device_datetime_converted,  # Device timestamp converted to datetime
-                systemDate=current_time,  # System timestamp
+                timestamp=current_time,  # Data do servidor
+                deviceTimestamp=device_datetime_converted,  # Data do dispositivo convertida para datetime
                 mensagem_raw=raw_message
             )
             
-            # Save to database
+            # Save vehicle data
             db_manager.insert_vehicle_data(vehicle_data)
-            logger.debug(f"Vehicle data saved for IMEI: {imei}")
+            
+            # Update vehicle information
+            self._update_vehicle_info(parsed_data, client_ip, raw_message)
+            
+            # Generate acknowledgment primeiro
+            response = protocol_parser.generate_acknowledgment(parsed_data)
+            if response:
+                logger.log_outgoing_message(client_ip, imei, response)
+            
+            # IMPLEMENTAÇÃO EXATA DO C#: Verificar e executar comandos após salvar dados
+            self._execute_command_logic(imei, client_ip)
+            
+            return response
             
         except Exception as e:
-            logger.error(f"Error saving vehicle data: {e}")
+            logger.error(f"Error handling message from {client_ip}: {e}", exc_info=True)
+            return None
     
-    def update_vehicle(self, parsed_data: Dict[str, Any], client_ip: str, raw_message: str):
+    def _update_vehicle_info(self, parsed_data: Dict[str, Any], client_ip: str, raw_message: str):
         """Update vehicle information in vehicles table"""
         try:
             imei = parsed_data.get('imei')
             if not imei:
                 return
-                
-            report_type = parsed_data.get('report_type', '')
             
-            # Get existing vehicle or create basic structure
-            vehicle = db_manager.get_vehicle_by_imei(imei)
+            # Get existing vehicle or create new one
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             
-            # Update ignition status based on message type
-            if report_type == 'GTIGN':  # Ignition ON
-                if vehicle:
-                    vehicle_data = dict(vehicle)
-                    if '_id' in vehicle_data:
-                        del vehicle_data['_id']
-                    vehicle_data['ignicao'] = True
-                    vehicle_data['tsusermanu'] = datetime.utcnow()
-                    
-                    # Fix field name compatibility
-                    if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
-                        vehicle_data['IMEI'] = vehicle_data['imei']
-                        del vehicle_data['imei']
-                    
-                    updated_vehicle = Vehicle(**vehicle_data)
-                    db_manager.upsert_vehicle(updated_vehicle)
-                    logger.debug(f"Ignition ON updated for IMEI: {imei}")
-                    
-            elif report_type == 'GTIGF':  # Ignition OFF
-                if vehicle:
-                    vehicle_data = dict(vehicle)
-                    if '_id' in vehicle_data:
-                        del vehicle_data['_id']
-                    vehicle_data['ignicao'] = False
-                    vehicle_data['tsusermanu'] = datetime.utcnow()
-                    
-                    # Fix field name compatibility
-                    if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
-                        vehicle_data['IMEI'] = vehicle_data['imei']
-                        del vehicle_data['imei']
-                    
-                    updated_vehicle = Vehicle(**vehicle_data)
-                    db_manager.upsert_vehicle(updated_vehicle)
-                    logger.debug(f"Ignition OFF updated for IMEI: {imei}")
+            # Prepare vehicle data with new structure
+            vehicle_data = {
+                'IMEI': imei,
+                'tsusermanu': datetime.utcnow()
+            }
             
-            # Process ACK responses for command confirmation
-            elif report_type == 'GTOUT' and parsed_data.get('msg_type') == 'ACK':
-                self._process_gtout_ack(imei, parsed_data, raw_message)
+            # Update ignition status if available
+            if 'ignition' in parsed_data:
+                vehicle_data['ignicao'] = parsed_data['ignition']
+                if parsed_data['ignition']:
+                    logger.info(f"Ignition ON detected for IMEI {imei}")
+                else:
+                    logger.info(f"Ignition OFF detected for IMEI {imei}")
+            
+            # Update battery level if available
+            if parsed_data.get('battery_level'):
+                try:
+                    battery_voltage = float(parsed_data['battery_level'])
+                    vehicle_data['bateriavoltagem'] = battery_voltage
                     
-        except Exception as e:
-            logger.error(f"Error updating vehicle: {e}")
-    
-    def _process_gtout_ack(self, imei: str, parsed_data: Dict[str, Any], raw_message: str):
-        """Process GTOUT ACK response to update blocking status"""
-        try:
-            # Check if this is a successful ACK (status 0001, 0002, or 0003)
-            status = parsed_data.get('status', '')
-            if status in ['0001', '0002', '0003']:  # Successful command execution
-                
-                vehicle = db_manager.get_vehicle_by_imei(imei)
-                if vehicle:
-                    vehicle_data = dict(vehicle)
-                    if '_id' in vehicle_data:
-                        del vehicle_data['_id']
-                    
-                    # Check what type of command was pending to determine the result
-                    current_command = vehicle_data.get('comandobloqueo')
-                    if current_command is True:
-                        # This was a blocking command confirmation
-                        vehicle_data['bloqueado'] = True
-                        vehicle_data['comandobloqueo'] = None  # Clear pending command
-                        logger.info(f"✅ Bloqueio confirmado para IMEI {imei} - Status: {status}")
-                    elif current_command is False:
-                        # This was an unblocking command confirmation
-                        vehicle_data['bloqueado'] = False
-                        vehicle_data['comandobloqueo'] = None  # Clear pending command
-                        logger.info(f"✅ Desbloqueio confirmado para IMEI {imei} - Status: {status}")
+                    # Check for low battery
+                    if battery_voltage < 10.0:
+                        vehicle_data['bateriabaixa'] = True
+                        vehicle_data['ultimoalertabateria'] = datetime.utcnow()
+                        logger.warning(f"Critical battery level for IMEI {imei}: {battery_voltage}V")
+                    elif battery_voltage < 12.0:
+                        vehicle_data['bateriabaixa'] = True
+                        logger.info(f"Low battery level for IMEI {imei}: {battery_voltage}V")
                     else:
-                        # Fallback: try to determine from ACK message content
-                        # Look for status field in GTOUT ACK which indicates result
-                        if parsed_data.get('blocked', False):  # From GTOUT parser
-                            vehicle_data['bloqueado'] = True
-                            logger.info(f"✅ Bloqueio confirmado (ACK) para IMEI {imei} - Status: {status}")
-                        else:
-                            vehicle_data['bloqueado'] = False
-                            logger.info(f"✅ Desbloqueio confirmado (ACK) para IMEI {imei} - Status: {status}")
-                        vehicle_data['comandobloqueo'] = None
-                    
-                    vehicle_data['tsusermanu'] = datetime.utcnow()
-                    
-                    # Fix field name compatibility - Vehicle model expects IMEI (uppercase)
-                    if 'imei' in vehicle_data and 'IMEI' not in vehicle_data:
-                        vehicle_data['IMEI'] = vehicle_data['imei']
-                        del vehicle_data['imei']
-                    
-                    from models import Vehicle
-                    updated_vehicle = Vehicle(**vehicle_data)
-                    db_manager.upsert_vehicle(updated_vehicle)
-                    
-            else:
-                logger.warning(f"GTOUT command failed for IMEI {imei} - Status: {status}")
+                        vehicle_data['bateriabaixa'] = False
+                except (ValueError, TypeError):
+                    pass
+            
+            # Handle blocking/unblocking commands
+            if parsed_data.get('report_type') == 'GTOUT':
+                # Process blocking command response
+                if parsed_data.get('command_result'):
+                    vehicle_data['bloqueado'] = True
+                    vehicle_data['comandobloqueo'] = None  # Clear pending command
+                    logger.info(f"Vehicle blocking command confirmed for IMEI {imei}")
+            
+            # Handle IP change commands
+            if parsed_data.get('report_type') == 'GTSRI':
+                # Process IP change command response
+                ip_change_success = parsed_data.get('ip_change_success', False)
+                if ip_change_success:
+                    logger.info(f"IP change command confirmed for IMEI {imei}")
+                else:
+                    logger.warning(f"IP change command failed for IMEI {imei}: status {parsed_data.get('status', 'unknown')}")
+            
+            # Merge with existing data if available
+            if existing_vehicle:
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+            
+            # Create vehicle object and save
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            
+        except Exception as e:
+            logger.error(f"Error updating vehicle info for IMEI {parsed_data.get('imei')}: {e}", exc_info=True)
+    
+    def _execute_command_logic(self, imei: str, client_ip: str):
+        """IMPLEMENTAÇÃO EXATA DO CÓDIGO C# - Função Command()"""
+        try:
+            # Buscar veículo exatamente como no C#: var DtoVeiculo = obj.veiculos.GetVeiculo(IMEI);
+            veiculo = db_manager.get_vehicle_by_imei(imei)
+            
+            if veiculo is None:
+                return
+            
+            # Verificar se há comando pendente (True = bloquear, False = desbloquear)
+            comando_pendente = veiculo.get('comandobloqueo')
+            if comando_pendente is not None:  # True ou False, mas não None
+                # True = comando para bloquear, False = comando para desbloquear
+                if comando_pendente == True:
+                    bit = "1"  # Bloquear
+                else:  # comando_pendente == False
+                    bit = "0"  # Desbloquear
+                
+                # Comando exato do C# para GV50: 
+                # Send(handler, "AT+GTOUT=" + DtoVeiculo.Rastreador.ds_senha + "," + bit + ",,,,,,0,,,,,,,000" + bit + "$");
+                comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
+                
+                logger.warning(f"🚨 COMANDO GV50 ENVIADO: {comando}")
+                logger.warning(f"IMEI: {imei} | Ação: {'BLOQUEAR' if bit == '1' else 'DESBLOQUEAR'}")
+                
+                # Enviar comando via TCP (implementar envio direto)
+                self._send_command_to_device(comando, client_ip, imei)
                 
         except Exception as e:
-            logger.error(f"Error processing GTOUT ACK for IMEI {imei}: {e}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
+            logger.error(f"Erro na lógica de comando para {imei}: {e}")
     
-    # Command execution removed - now handled exclusively by TCP server
+    def _send_command_to_device(self, command: str, client_ip: str, imei: str):
+        """Enviar comando diretamente para o dispositivo via TCP"""
+        try:
+            # Adicionar comando à lista de comandos pendentes para este dispositivo
+            if not hasattr(self, 'pending_commands'):
+                self.pending_commands = {}
+            
+            if imei not in self.pending_commands:
+                self.pending_commands[imei] = []
+            
+            self.pending_commands[imei].append(command)
+            
+            logger.warning(f"📤 COMANDO ADICIONADO À FILA PARA {imei}: {command}")
+            logger.log_outgoing_message(client_ip, imei, f"COMMAND_QUEUED: {command}")
+            
+        except Exception as e:
+            logger.error(f"Erro ao preparar comando: {e}")
+    
+    def get_pending_command(self, imei: str) -> Optional[str]:
+        """Recuperar comando pendente para envio via TCP server"""
+        try:
+            if hasattr(self, 'pending_commands') and imei in self.pending_commands:
+                if self.pending_commands[imei]:
+                    command = self.pending_commands[imei].pop(0)
+                    logger.warning(f"🚀 ENVIANDO COMANDO PARA {imei}: {command}")
+                    return command
+            return None
+        except Exception as e:
+            logger.error(f"Erro ao recuperar comando: {e}")
+            return None
+
+    def save_vehicle_data(self, vehicle_data: Dict[str, Any]):
+        """Save vehicle data to database - C# style method"""
+        try:
+            # Convert dict to VehicleData object
+            current_time = datetime.utcnow()
+            
+            # Converter data do dispositivo para datetime
+            device_timestamp_str = vehicle_data.get('device_timestamp', '')
+            device_datetime_converted = convert_device_timestamp(device_timestamp_str)
+            
+            # Debug da conversão
+            logger.info(f"🔄 Converting device timestamp: '{device_timestamp_str}' -> {device_datetime_converted}")
+            
+            vehicle_record = VehicleData(
+                imei=vehicle_data.get('imei', ''),
+                longitude=vehicle_data.get('longitude', '0'),
+                latitude=vehicle_data.get('latitude', '0'),
+                altitude=vehicle_data.get('altitude', '0'),
+                timestamp=current_time,  # Data do servidor
+                deviceTimestamp=device_datetime_converted,  # Data do dispositivo convertida para datetime
+                mensagem_raw=vehicle_data.get('raw_message', '')
+            )
+            
+            # Log da conversão para debug
+            if device_datetime_converted:
+                logger.info(f"✅ Device timestamp converted: {device_timestamp_str} -> {device_datetime_converted}")
+            else:
+                logger.warning(f"❌ Failed to convert device timestamp: {device_timestamp_str}")
+            
+            db_manager.insert_vehicle_data(vehicle_record)
+            logger.debug(f"Saved vehicle data for IMEI: {vehicle_data.get('imei')}")
+            
+        except Exception as e:
+            logger.error(f"Error saving vehicle data: {e}")
+    
+    def update_vehicle_ignition(self, imei: str, ignition_status: bool):
+        """Update vehicle ignition status - new structure"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {'IMEI': imei, 'ignicao': ignition_status, 'tsusermanu': datetime.utcnow()}
+            if existing_vehicle:
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Updated ignition status for {imei}: {ignition_status}")
+        except Exception as e:
+            logger.error(f"Error updating vehicle ignition: {e}")
+    
+    def update_vehicle_blocking(self, imei: str, blocked: bool):
+        """Update vehicle blocking status after ACK confirmation"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {
+                'IMEI': imei, 
+                'bloqueado': blocked, 
+                'comandobloqueo': None,  # Clear pending command
+                'tsusermanu': datetime.utcnow()
+            }
+            
+            if existing_vehicle:
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+        except Exception as e:
+            logger.error(f"Error updating vehicle blocking status: {e}")
+    
+    def set_blocking_command(self, imei: str, should_block: bool):
+        """Set pending blocking command for vehicle"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {'IMEI': imei, 'comandobloqueo': should_block, 'tsusermanu': datetime.utcnow()}
+            if existing_vehicle:
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Set blocking command for {imei}: {'block' if should_block else 'unblock'}")
+        except Exception as e:
+            logger.error(f"Error setting blocking command: {e}")
+    
+    def set_ip_change_command(self, imei: str):
+        """Set pending IP change command for vehicle"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Merge with existing data
+            vehicle_data = {'IMEI': imei, 'comandotrocarip': True, 'tsusermanu': datetime.utcnow()}
+            if existing_vehicle:
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Set IP change command for {imei}")
+        except Exception as e:
+            logger.error(f"Error setting IP change command: {e}")
+    
+    def update_vehicle_motion_status(self, imei: str, motion_status: str):
+        """Update vehicle motion status based on GTSTT message"""
+        try:
+            existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+            
+            # Interpretar estado do movimento
+            motion_descriptions = {
+                '11': 'Start Moving',
+                '12': 'Stop Moving', 
+                '21': 'Start Moving (Vibration)',
+                '22': 'Stop Moving (Vibration)',
+                '41': 'Sensor Rest',
+                '42': 'Sensor Motion'
+            }
+            
+            motion_description = motion_descriptions.get(motion_status, f'Unknown Status ({motion_status})')
+            is_moving = motion_status in ['11', '21', '42']
+            
+            # Merge with existing data
+            vehicle_data = {
+                'IMEI': imei, 
+                'motion_status': motion_status,
+                'motion_description': motion_description,
+                'is_moving': is_moving,
+                'tsusermanu': datetime.utcnow()
+            }
+            
+            if existing_vehicle:
+                for key, value in existing_vehicle.items():
+                    if key not in vehicle_data and value is not None and key != '_id':
+                        vehicle_data[key] = value
+                        
+            vehicle = Vehicle(**vehicle_data)
+            db_manager.upsert_vehicle(vehicle)
+            logger.info(f"Updated motion status for {imei}: {motion_description} (status: {motion_status})")
+            
+        except Exception as e:
+            logger.error(f"Error updating vehicle motion status: {e}")
 
 # Global message handler instance
 message_handler = MessageHandler()

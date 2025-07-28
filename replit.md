@@ -98,24 +98,6 @@ Preferred communication style: Simple, everyday language.
 ✓ Formato correto: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
 ✓ Valores padrão configurados: servidor principal e backup usando mesmo IP/porta
 ✓ Sistema dual operacional: GTSRI (troca IP) + GTOUT (bloqueio) funcionando simultaneamente
-✓ SISTEMA COMPLETAMENTE LIMPO E SIMPLIFICADO: Sem hardcode, logs limpos, foco nas 2 tabelas
-✓ Configuração total via .env: Todas as variáveis movidas para arquivo de ambiente
-✓ Logs categóricos restaurados: DEBUG, INFO, WARNING, ERROR, PROTOCOL controlados via .env
-✓ Arquitetura simplificada: vehicle_data (salvar dados) + vehicles (ler comandos/status)
-✓ Message handler corrigido: Métodos save_vehicle_data e update_vehicle funcionais
-✓ Sistema testado e operacional: Comandos GTOUT + GTSRI executando corretamente
-✓ ERRO CRÍTICO RESOLVIDO: Removido loop de monitoramento com erro 'get_connection_count'
-✓ TCP Server reescrito sem métodos inexistentes: Sistema funcionando sem erros de monitoring
-✓ Sistema operacional: Servidor TCP na porta 8000, comandos GTOUT/GTSRI funcionais
-✓ PARSERS COMPLETADOS: Adicionados GTIGL (ignição/iluminação) e GTHBD (heartbeat)
-✓ Erro "No IMEI found" eliminado: Todos os tipos de mensagem agora são processados corretamente
-✓ Suporte completo ao protocolo: GTFRI, GTIGN, GTIGF, GTOUT, GTSRI, GTSTT, GTPDP, GTIGL, GTHBD
-✓ ERRO COMANDO BLOQUEIO CORRIGIDO: Removida lógica duplicada do message_handler.py
-✓ Sistema de comandos unificado: Apenas tcp_server.py executa comandos GTOUT/GTSRI
-✓ Correção definitiva: 'str' object has no attribute 'send' eliminado
-✓ STATUS DE BLOQUEIO IMPLEMENTADO: Processamento de ACK GTOUT para atualizar status bloqueado
-✓ Compatibilidade de campos corrigida: IMEI maiúsculo/minúsculo resolvido em todos os contextos
-✓ Sistema completo: Comando enviado → ACK recebido → Status atualizado automaticamente
 
 ## System Architecture
 

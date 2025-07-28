@@ -66,47 +66,34 @@ class DatabaseManager:
             return False
     
     def upsert_vehicle(self, vehicle: Vehicle) -> bool:
-        """Update or insert vehicle information - handles both imei and IMEI fields"""
+        """Update or insert vehicle information"""
         try:
             if self.db is None:
                 return False
             collection = self.db['vehicles']
-            
-            # Try to find existing vehicle with either field name
-            existing = collection.find_one({'imei': vehicle.IMEI})
-            if not existing:
-                existing = collection.find_one({'IMEI': vehicle.IMEI})
-            
+            filter_query = {'IMEI': vehicle.IMEI}  # Usar novo campo IMEI
             update_data = vehicle.to_dict()
             
-            if existing:
-                # Update existing document using its _id
-                result = collection.update_one(
-                    {'_id': existing['_id']},
-                    {'$set': update_data}
-                )
-                operation = 'UPDATE'
-            else:
-                # Insert new document
-                result = collection.insert_one(update_data)
-                operation = 'INSERT'
+            result = collection.update_one(
+                filter_query,
+                {'$set': update_data},
+                upsert=True
+            )
             
-            logger.debug(f"{operation} vehicle for IMEI: {vehicle.IMEI}")
+            operation = 'UPDATE' if result.matched_count > 0 else 'INSERT'
+            logger.debug(f"Upserted vehicle for IMEI: {vehicle.IMEI}")
             return True
         except Exception as e:
             logger.error(f"Error upserting vehicle for IMEI {vehicle.IMEI}: {e}")
             return False
     
     def get_vehicle_by_imei(self, imei: str) -> Optional[Dict[str, Any]]:
-        """Get vehicle information by IMEI - search both imei and IMEI fields"""
+        """Get vehicle information by IMEI"""
         try:
             if self.db is None:
                 return None
             collection = self.db['vehicles']
-            # Try both field names for compatibility
-            vehicle = collection.find_one({'imei': imei})
-            if not vehicle:
-                vehicle = collection.find_one({'IMEI': imei})
+            vehicle = collection.find_one({'IMEI': imei})
             logger.debug(f"Retrieved vehicle for IMEI: {imei}")
             return vehicle
         except Exception as e:
