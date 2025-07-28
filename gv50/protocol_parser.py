@@ -44,6 +44,10 @@ class QueclinkProtocolParser:
                 return self._parse_gtstt(message)
             elif message_type == 'GTPDP':
                 return self._parse_gtpdp(message)
+            elif message_type == 'GTIGL':
+                return self._parse_gtigl(message)
+            elif message_type == 'GTHBD':
+                return self._parse_gthbd(message)
             
             # Fallback to regex patterns for unknown types
             pattern = self.message_patterns.get(message_type)
@@ -400,6 +404,91 @@ class QueclinkProtocolParser:
             logger.error(f"Error parsing GTPDP message: {e}")
             return {'error': f'GTPDP parse error: {str(e)}'}
     
+    def _parse_gtigl(self, message: str) -> Dict[str, str]:
+        """Parse GTIGL message - Ignition/Illumination related events"""
+        try:
+            # Remove prefix and suffix
+            if not message.startswith('+') or not message.endswith('$'):
+                return {'error': 'Invalid GTIGL message format'}
+            
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid GTIGL message structure'}
+            
+            msg_type = msg_parts[0]  # RESP, BUFF, ACK
+            data_part = msg_parts[1]
+            
+            # Split data part by comma
+            fields = data_part.split(',')
+            
+            if len(fields) < 3:
+                return {'error': f'Insufficient fields in GTIGL: {len(fields)}'}
+            
+            # GTIGL format: +BUFF:GTIGL,protocol_version,imei,device_name,reserved,ignition_state,gps_accuracy,speed,course,altitude,longitude,latitude,device_timestamp,...
+            data = {
+                'msg_type': msg_type,
+                'report_type': 'GTIGL',
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',  # IMEI is in position 2
+                'device_name': fields[3] if len(fields) > 3 else '',
+                'reserved': fields[4] if len(fields) > 4 else '',
+                'ignition_state': fields[5] if len(fields) > 5 else '0',  # 00=off, 01=on
+                'gps_accuracy': fields[6] if len(fields) > 6 else '0',
+                'speed': fields[7] if len(fields) > 7 else '0',
+                'course': fields[8] if len(fields) > 8 else '0',
+                'altitude': fields[9] if len(fields) > 9 else '0',
+                'longitude': fields[10] if len(fields) > 10 else '0',
+                'latitude': fields[11] if len(fields) > 11 else '0',
+                'device_timestamp': fields[12] if len(fields) > 12 else '',
+                'counter': fields[-1] if len(fields) > 20 else ''
+            }
+            
+            logger.debug(f"Successfully parsed GTIGL message for IMEI: {data.get('imei', 'unknown')}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTIGL message: {e}")
+            return {'error': f'GTIGL parse error: {str(e)}'}
+    
+    def _parse_gthbd(self, message: str) -> Dict[str, str]:
+        """Parse GTHBD message - Heartbeat"""
+        try:
+            # Remove prefix and suffix
+            if not message.startswith('+') or not message.endswith('$'):
+                return {'error': 'Invalid GTHBD message format'}
+            
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid GTHBD message structure'}
+            
+            msg_type = msg_parts[0]  # RESP, BUFF, ACK
+            data_part = msg_parts[1]
+            
+            # Split data part by comma
+            fields = data_part.split(',')
+            
+            if len(fields) < 3:
+                return {'error': f'Insufficient fields in GTHBD: {len(fields)}'}
+            
+            # GTHBD format: +ACK:GTHBD,protocol_version,imei,,timestamp,counter$
+            data = {
+                'msg_type': msg_type,
+                'report_type': 'GTHBD',
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',  # IMEI is in position 2
+                'device_timestamp': fields[4] if len(fields) > 4 else '',
+                'counter': fields[5] if len(fields) > 5 else ''
+            }
+            
+            logger.debug(f"Successfully parsed GTHBD message for IMEI: {data.get('imei', 'unknown')}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTHBD message: {e}")
+            return {'error': f'GTHBD parse error: {str(e)}'}
+    
     def _convert_numeric_fields(self, data: Dict[str, str]):
         """Convert numeric fields to proper format"""
         # Convert coordinates to proper format
@@ -421,7 +510,7 @@ class QueclinkProtocolParser:
     def _detect_message_type(self, message: str) -> Optional[str]:
         """Detect message type from the message content"""
         # Check for all supported message types
-        supported_types = ['GTFRI', 'GTIGN', 'GTIGF', 'GTOUT', 'GTSRI', 'GTSTT', 'GTPDP']
+        supported_types = ['GTFRI', 'GTIGN', 'GTIGF', 'GTOUT', 'GTSRI', 'GTSTT', 'GTPDP', 'GTIGL', 'GTHBD']
         
         for msg_type in supported_types:
             if f':{msg_type},' in message:

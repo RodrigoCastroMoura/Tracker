@@ -107,6 +107,9 @@ Preferred communication style: Simple, everyday language.
 ✓ ERRO CRÍTICO RESOLVIDO: Removido loop de monitoramento com erro 'get_connection_count'
 ✓ TCP Server reescrito sem métodos inexistentes: Sistema funcionando sem erros de monitoring
 ✓ Sistema operacional: Servidor TCP na porta 8000, comandos GTOUT/GTSRI funcionais
+✓ PARSERS COMPLETADOS: Adicionados GTIGL (ignição/iluminação) e GTHBD (heartbeat)
+✓ Erro "No IMEI found" eliminado: Todos os tipos de mensagem agora são processados corretamente
+✓ Suporte completo ao protocolo: GTFRI, GTIGN, GTIGF, GTOUT, GTSRI, GTSTT, GTPDP, GTIGL, GTHBD
 
 ## System Architecture
 
