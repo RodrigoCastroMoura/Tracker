@@ -46,8 +46,7 @@ class MessageHandler:
             if response:
                 logger.log_outgoing_message(client_ip, imei, response)
             
-            # Execute command logic (GTOUT and GTSRI)
-            self._execute_command_logic(imei, client_ip)
+            # Command execution is now handled by TCP server directly
             
             return response
             
@@ -124,77 +123,7 @@ class MessageHandler:
         except Exception as e:
             logger.error(f"Error updating vehicle: {e}")
     
-    def _execute_command_logic(self, imei: str, client_socket):
-        """Execute command logic from C# - GTOUT and GTSRI"""
-        try:
-            # Get vehicle from database
-            vehicle = db_manager.get_vehicle_by_imei(imei)
-            if not vehicle:
-                return
-            
-            commands_executed = []
-            
-            # Check for blocking/unblocking command (GTOUT)
-            if vehicle.get('comandobloqueo') is not None:
-                if vehicle.get('comandobloqueo'):
-                    # Send blocking command
-                    command = "AT+GTOUT=gv50,1,,,,,,0,,,,,,,0001$"
-                    self._send_command(client_socket, command, imei, "BLOQUEIO")
-                    commands_executed.append("BLOQUEIO (GTOUT)")
-                else:
-                    # Send unblocking command  
-                    command = "AT+GTOUT=gv50,0,,,,,,0,,,,,,,0000$"
-                    self._send_command(client_socket, command, imei, "DESBLOQUEIO")
-                    commands_executed.append("DESBLOQUEIO (GTOUT)")
-                
-                # Clear command flag
-                self._clear_command_flag(imei, 'comandobloqueo')
-            
-            # Check for IP change command (GTSRI)
-            if vehicle.get('comandotrocarip'):
-                from config import Config
-                command = f"AT+GTSRI=gv50,3,,1,{Config.PRIMARY_SERVER_IP},{Config.PRIMARY_SERVER_PORT},{Config.BACKUP_SERVER_IP},{Config.BACKUP_SERVER_PORT},,60,0,0,0,,0,FFFF$"
-                self._send_command(client_socket, command, imei, "TROCA DE IP")
-                commands_executed.append("TROCA DE IP (GTSRI)")
-                
-                # Clear command flag
-                self._clear_command_flag(imei, 'comandotrocarip')
-            
-            if commands_executed:
-                logger.info(f"Comandos executados para IMEI {imei}: {', '.join(commands_executed)}")
-                
-        except Exception as e:
-            logger.error(f"Error executing commands for IMEI {imei}: {e}")
-    
-    def _send_command(self, client_socket, command: str, imei: str, command_type: str):
-        """Send command to device via socket"""
-        try:
-            client_socket.send(command.encode('utf-8'))
-            logger.log_protocol(f"COMANDO {command_type} ENVIADO: {command}")
-            logger.info(f"⚡ Comando {command_type} enviado para IMEI {imei}")
-        except Exception as e:
-            logger.error(f"Error sending {command_type} command to IMEI {imei}: {e}")
-    
-    def _clear_command_flag(self, imei: str, flag_name: str):
-        """Clear command flag in database"""
-        try:
-            vehicle = db_manager.get_vehicle_by_imei(imei)
-            if vehicle:
-                vehicle_data = dict(vehicle)
-                if '_id' in vehicle_data:
-                    del vehicle_data['_id']
-                
-                if flag_name == 'comandobloqueo':
-                    vehicle_data['comandobloqueo'] = None
-                elif flag_name == 'comandotrocarip':
-                    vehicle_data['comandotrocarip'] = False
-                
-                vehicle_data['tsusermanu'] = datetime.utcnow()
-                updated_vehicle = Vehicle(**vehicle_data)
-                db_manager.upsert_vehicle(updated_vehicle)
-                
-        except Exception as e:
-            logger.error(f"Error clearing {flag_name} flag for IMEI {imei}: {e}")
+    # Command execution removed - now handled exclusively by TCP server
 
 # Global message handler instance
 message_handler = MessageHandler()

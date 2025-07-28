@@ -110,6 +110,9 @@ Preferred communication style: Simple, everyday language.
 ✓ PARSERS COMPLETADOS: Adicionados GTIGL (ignição/iluminação) e GTHBD (heartbeat)
 ✓ Erro "No IMEI found" eliminado: Todos os tipos de mensagem agora são processados corretamente
 ✓ Suporte completo ao protocolo: GTFRI, GTIGN, GTIGF, GTOUT, GTSRI, GTSTT, GTPDP, GTIGL, GTHBD
+✓ ERRO COMANDO BLOQUEIO CORRIGIDO: Removida lógica duplicada do message_handler.py
+✓ Sistema de comandos unificado: Apenas tcp_server.py executa comandos GTOUT/GTSRI
+✓ Correção definitiva: 'str' object has no attribute 'send' eliminado
 
 ## System Architecture
 
