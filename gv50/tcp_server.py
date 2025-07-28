@@ -117,7 +117,8 @@ class GV50TCPServer:
                 return
             
             # Get vehicle from database to check for pending commands
-            vehicle = message_handler.db_manager.get_vehicle_by_imei(imei)
+            from database import db_manager
+            vehicle = db_manager.get_vehicle_by_imei(imei)
             if not vehicle:
                 return
             
@@ -178,7 +179,8 @@ class GV50TCPServer:
     def _clear_command_flag(self, imei: str, flag_name: str):
         """Clear command flag in database"""
         try:
-            vehicle = message_handler.db_manager.get_vehicle_by_imei(imei)
+            from database import db_manager
+            vehicle = db_manager.get_vehicle_by_imei(imei)
             if vehicle:
                 from models import Vehicle
                 vehicle_data = dict(vehicle)
@@ -192,7 +194,7 @@ class GV50TCPServer:
                 
                 vehicle_data['tsusermanu'] = datetime.utcnow()
                 updated_vehicle = Vehicle(**vehicle_data)
-                message_handler.db_manager.upsert_vehicle(updated_vehicle)
+                db_manager.upsert_vehicle(updated_vehicle)
                 
         except Exception as e:
             logger.error(f"Error clearing {flag_name} flag for IMEI {imei}: {e}")

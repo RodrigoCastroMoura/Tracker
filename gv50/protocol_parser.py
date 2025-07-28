@@ -42,6 +42,8 @@ class QueclinkProtocolParser:
                 return self._parse_gtsri(message)
             elif message_type == 'GTSTT':
                 return self._parse_gtstt(message)
+            elif message_type == 'GTPDP':
+                return self._parse_gtpdp(message)
             
             # Fallback to regex patterns for unknown types
             pattern = self.message_patterns.get(message_type)
@@ -360,6 +362,44 @@ class QueclinkProtocolParser:
             logger.error(f"Error parsing GTSRI: {e}")
             return {'error': f'GTSRI parse error: {str(e)}'}
     
+    def _parse_gtpdp(self, message: str) -> Dict[str, str]:
+        """Parse GTPDP message - PDP context activation"""
+        try:
+            # Remove prefix and suffix
+            if not message.startswith('+') or not message.endswith('$'):
+                return {'error': 'Invalid GTPDP message format'}
+            
+            # Split by ':' first to get msg_type and data part
+            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
+            if len(msg_parts) != 2:
+                return {'error': 'Invalid GTPDP message structure'}
+            
+            msg_type = msg_parts[0]  # RESP, BUFF, ACK
+            data_part = msg_parts[1]
+            
+            # Split data part by comma
+            fields = data_part.split(',')
+            
+            if len(fields) < 3:
+                return {'error': f'Insufficient fields in GTPDP: {len(fields)}'}
+            
+            # GTPDP format: +RESP:GTPDP,protocol_version,imei,,timestamp,counter$
+            data = {
+                'msg_type': msg_type,
+                'report_type': 'GTPDP',
+                'protocol_version': fields[1] if len(fields) > 1 else '',
+                'imei': fields[2] if len(fields) > 2 else '',  # IMEI is in position 2
+                'device_timestamp': fields[4] if len(fields) > 4 else '',
+                'counter': fields[5] if len(fields) > 5 else ''
+            }
+            
+            logger.debug(f"Successfully parsed GTPDP message for IMEI: {data.get('imei', 'unknown')}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTPDP message: {e}")
+            return {'error': f'GTPDP parse error: {str(e)}'}
+    
     def _convert_numeric_fields(self, data: Dict[str, str]):
         """Convert numeric fields to proper format"""
         # Convert coordinates to proper format
@@ -380,6 +420,14 @@ class QueclinkProtocolParser:
     
     def _detect_message_type(self, message: str) -> Optional[str]:
         """Detect message type from the message content"""
+        # Check for all supported message types
+        supported_types = ['GTFRI', 'GTIGN', 'GTIGF', 'GTOUT', 'GTSRI', 'GTSTT', 'GTPDP']
+        
+        for msg_type in supported_types:
+            if f':{msg_type},' in message:
+                return msg_type
+        
+        # Fallback to pattern-based detection
         for msg_type in self.message_patterns.keys():
             if f':{msg_type},' in message:
                 return msg_type
