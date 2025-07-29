@@ -375,14 +375,19 @@ class GV50TCPServerCSharpStyle:
                     return  # Não processar heartbeat como mensagem normal
                 
                 elif command_type == "GTOUT":
-                    if len(command_parts) > 4:
+                    if len(command_parts) >= 3:
                         imei = command_parts[2]
-                        status = command_parts[4]
+                        # Status pode estar na posição 3 ou 4, dependendo do formato
+                        status = command_parts[3] if len(command_parts) > 3 else "0000"
+                        
+                        # Remover caracteres especiais do status
+                        status = status.replace('$', '').strip()
+                        
+                        logger.info(f"Processing GTOUT ACK for {imei} with status: '{status}'")
                         
                         # CORREÇÃO: Update vehicle blocking status like C#
-                        # Status "0000" significa sucesso na confirmação
-                        # Precisamos verificar qual comando foi executado (bit 1 ou 0)
-                        if status == "0000":  # Comando executado com sucesso
+                        # Status "0000" ou vazio significa sucesso na confirmação
+                        if status == "0000" or status == "":  # Comando executado com sucesso
                             # Buscar veículo para determinar se foi bloqueio ou desbloqueio
                             vehicle = db_manager.get_vehicle_by_imei(imei)
                             if vehicle:
@@ -403,28 +408,23 @@ class GV50TCPServerCSharpStyle:
                                 
                                 logger.info(f"✅ Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
                         else:
-                            # CORREÇÃO: Status "0001" pode ser sucesso em alguns casos
-                            # Verificar baseado no protocolo Queclink
-                            if status in ["0001", "0002", "0003"]:
-                                logger.info(f"Command executed for {imei} with status: {status}")
-                                # Processar como sucesso mas verificar tipo do comando
-                                vehicle = db_manager.get_vehicle_by_imei(imei)
-                                logger.info(f"DEBUG: Vehicle data for {imei}: comandobloqueo={vehicle.get('comandobloqueo') if vehicle else 'N/A'}")
-                                
-                                if vehicle and vehicle.get('comandobloqueo') is not None:
-                                    if vehicle.get('comandobloqueo') == True:
-                                        blocked = True  # Comando de bloqueio executado
-                                        logger.info(f"Blocking command confirmed for {imei} - Vehicle BLOCKED (status: {status})")
-                                    else:
-                                        blocked = False  # Comando de desbloqueio executado
-                                        logger.info(f"Unblocking command confirmed for {imei} - Vehicle UNBLOCKED (status: {status})")
-                                    
-                                    message_handler.update_vehicle_blocking(imei, blocked)
-                                    logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+                            # Para qualquer status não vazio, processar como ACK válido
+                            logger.info(f"Processing command ACK for {imei} with status: {status}")
+                            vehicle = db_manager.get_vehicle_by_imei(imei)
+                            logger.info(f"DEBUG: Vehicle data for {imei}: comandobloqueo={vehicle.get('comandobloqueo') if vehicle else 'N/A'}")
+                            
+                            if vehicle and vehicle.get('comandobloqueo') is not None:
+                                if vehicle.get('comandobloqueo') == True:
+                                    blocked = True  # Comando de bloqueio executado
+                                    logger.info(f"✅ Blocking command confirmed for {imei} - Vehicle BLOCKED")
                                 else:
-                                    logger.warning(f"No pending command found for {imei} when processing status {status}")
+                                    blocked = False  # Comando de desbloqueio executado
+                                    logger.info(f"✅ Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
+                                
+                                message_handler.update_vehicle_blocking(imei, blocked)
+                                logger.info(f"✅ Updated blocking status for {imei}: {'BLOCKED' if blocked else 'UNBLOCKED'}")
                             else:
-                                logger.warning(f"Command failed for {imei} with status: {status}")
+                                logger.warning(f"No pending command found for {imei} when processing ACK")
                     
         except Exception as e:
             logger.error(f"Error processing ACK message: {e}")

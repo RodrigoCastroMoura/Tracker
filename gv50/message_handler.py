@@ -265,7 +265,7 @@ class MessageHandler:
             vehicle_data = {
                 'IMEI': imei, 
                 'bloqueado': blocked, 
-                'comandobloqueo': None,  # Clear pending command
+                'comandobloqueo': False,  # Clear pending command (set to False, not None)
                 'tsusermanu': datetime.utcnow()
             }
             
