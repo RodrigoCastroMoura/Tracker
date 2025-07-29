@@ -393,7 +393,7 @@ class GV50TCPServerCSharpStyle:
                                     logger.info(f"🔴 Blocking command confirmed for {imei} - Vehicle BLOCKED")
                                 elif vehicle.get('comandobloqueo') == False:
                                     blocked = False  # Comando de desbloqueio executado
-                                    logger.info(f"ℹ🟢 Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
+                                    logger.info(f"🟢 Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
                                 else:
                                     # Comando já foi processado, manter status atual
                                     blocked = vehicle.get('bloqueado', False)
