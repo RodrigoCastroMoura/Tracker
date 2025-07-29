@@ -406,6 +406,14 @@ class GV50TCPServerCSharpStyle:
                                 
                                 message_handler.update_vehicle_blocking(imei, blocked)
                                 
+                                # Limpar cache de comandos enviados para permitir novos comandos
+                                if hasattr(self, 'commands_sent'):
+                                    # Remover entradas relacionadas a este IMEI
+                                    keys_to_remove = [key for key in self.commands_sent.keys() if key.startswith(f"{imei}_")]
+                                    for key in keys_to_remove:
+                                        del self.commands_sent[key]
+                                    logger.info(f"🧹 Cache de comandos limpo para {imei}")
+                                
                                 logger.info(f"✅ Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
                         else:
                             # Para qualquer status não vazio, processar como ACK válido
@@ -422,6 +430,15 @@ class GV50TCPServerCSharpStyle:
                                     logger.info(f"✅ Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
                                 
                                 message_handler.update_vehicle_blocking(imei, blocked)
+                                
+                                # Limpar cache de comandos enviados para permitir novos comandos
+                                if hasattr(self, 'commands_sent'):
+                                    # Remover entradas relacionadas a este IMEI
+                                    keys_to_remove = [key for key in self.commands_sent.keys() if key.startswith(f"{imei}_")]
+                                    for key in keys_to_remove:
+                                        del self.commands_sent[key]
+                                    logger.info(f"🧹 Cache de comandos limpo para {imei}")
+                                
                                 logger.info(f"✅ Updated blocking status for {imei}: {'BLOCKED' if blocked else 'UNBLOCKED'}")
                             else:
                                 logger.warning(f"No pending command found for {imei} when processing ACK")
@@ -470,27 +487,41 @@ class GV50TCPServerCSharpStyle:
                 # 1. Verificar comando de bloqueio/desbloqueio pendente
                 comando_pendente = vehicle.get('comandobloqueo')
                 if comando_pendente is not None:  # True ou False, não None
-                    # Determinar tipo de comando
-                    if comando_pendente == True:
-                        bit = "1"  # Bloquear
-                        acao = "BLOQUEAR"
-                    else:  # comando_pendente == False
-                        bit = "0"  # Desbloquear 
-                        acao = "DESBLOQUEAR"
+                    # Verificar se já enviamos comando para este IMEI nesta sessão
+                    if not hasattr(self, 'commands_sent'):
+                        self.commands_sent = {}
                     
-                    # Gerar comando exato do C#
-                    comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
+                    # Criar chave única para comando + IMEI
+                    command_key = f"{imei}_{comando_pendente}"
                     
-                    logger.warning(f"⚡ EXECUÇÃO IMEDIATA: {acao} para {imei}")
-                    logger.warning(f"⚡ COMANDO ENVIADO IMEDIATAMENTE: {comando}")
-                    
-                    # Enviar comando imediatamente via TCP
-                    self.send_data(client_socket, comando)
-                    comandos_enviados.append(f"BLOQUEIO: {acao}")
-                    
-                    # NÃO limpar comando pendente aqui - será limpo após processar ACK
-                    # A limpeza acontece no update_vehicle_blocking para garantir que
-                    # o ACK seja processado corretamente
+                    # Só enviar se ainda não foi enviado nesta sessão
+                    if command_key not in self.commands_sent:
+                        # Determinar tipo de comando
+                        if comando_pendente == True:
+                            bit = "1"  # Bloquear
+                            acao = "BLOQUEAR"
+                        else:  # comando_pendente == False
+                            bit = "0"  # Desbloquear 
+                            acao = "DESBLOQUEAR"
+                        
+                        # Gerar comando exato do C#
+                        comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
+                        
+                        logger.warning(f"⚡ EXECUÇÃO IMEDIATA: {acao} para {imei}")
+                        logger.warning(f"⚡ COMANDO ENVIADO IMEDIATAMENTE: {comando}")
+                        
+                        # Enviar comando imediatamente via TCP
+                        self.send_data(client_socket, comando)
+                        comandos_enviados.append(f"BLOQUEIO: {acao}")
+                        
+                        # Marcar como enviado para evitar reenvio
+                        self.commands_sent[command_key] = True
+                        
+                        # NÃO limpar comando pendente aqui - será limpo após processar ACK
+                        # A limpeza acontece no update_vehicle_blocking para garantir que
+                        # o ACK seja processado corretamente
+                    else:
+                        logger.info(f"ℹ️  Comando {acao} já foi enviado para {imei} - aguardando ACK")
                 
                 # 2. Verificar comando de troca de IP pendente - COMANDO GTSRI
                 comando_ip = vehicle.get('comandotrocarip')

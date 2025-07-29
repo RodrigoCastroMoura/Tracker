@@ -98,6 +98,11 @@ Preferred communication style: Simple, everyday language.
 ✓ Formato correto: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
 ✓ Valores padrão configurados: servidor principal e backup usando mesmo IP/porta
 ✓ Sistema dual operacional: GTSRI (troca IP) + GTOUT (bloqueio) funcionando simultaneamente
+✓ CORREÇÃO CRÍTICA 29/07: Sistema de bloqueio corrigido - comportamento estranho resolvido
+✓ Implementado cache de comandos enviados: evita reenvio desnecessário do mesmo comando
+✓ ACK processing corrigido: status extraído corretamente, caracteres especiais removidos
+✓ Limpeza automática do cache: comandos limpos após ACK para permitir novos comandos
+✓ Sistema funcional: comando enviado uma vez, ACK processado, status atualizado corretamente
 
 ## System Architecture
 
