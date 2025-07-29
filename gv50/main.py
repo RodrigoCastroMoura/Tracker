@@ -8,7 +8,7 @@ import sys
 import signal
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Import GV50 service
 from config import Config as GV50Config
@@ -127,12 +127,12 @@ class GV50TrackerService:
                 
                 # Update statistics
                 if connection_count > 0:
-                    self.stats['last_activity'] = datetime.now(datetime.UTC)
+                    self.stats['last_activity'] = datetime.now(timezone.utc)  # Mudança aqui
                 
                 # Health check
                 if not self._gv50_health_check():
                     gv50_logger.warning("GV50 service health check failed")
-                
+            
             except Exception as e:
                 gv50_logger.error(f"Error in GV50 monitoring loop: {e}")
                 time.sleep(10)
