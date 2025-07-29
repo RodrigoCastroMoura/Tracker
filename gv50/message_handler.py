@@ -215,10 +215,7 @@ class MessageHandler:
             # Converter data do dispositivo para datetime
             device_timestamp_str = vehicle_data.get('device_timestamp', '')
             device_datetime_converted = convert_device_timestamp(device_timestamp_str)
-            
-            # Debug da conversão
-            logger.info(f"🔄 Converting device timestamp: '{device_timestamp_str}' -> {device_datetime_converted}")
-            
+          
             vehicle_record = VehicleData(
                 imei=vehicle_data.get('imei', ''),
                 longitude=vehicle_data.get('longitude', '0'),
@@ -231,7 +228,7 @@ class MessageHandler:
             
             # Log da conversão para debug
             if device_datetime_converted:
-                logger.info(f"✅ Device timestamp converted: {device_timestamp_str} -> {device_datetime_converted}")
+                valor = None
             else:
                 logger.warning(f"❌ Failed to convert device timestamp: {device_timestamp_str}")
             

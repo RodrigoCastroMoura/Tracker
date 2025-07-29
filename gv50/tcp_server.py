@@ -286,7 +286,7 @@ class GV50TCPServerCSharpStyle:
                             'altitude': command_parts[9],
                             'longitude': command_parts[10],
                             'latitude': command_parts[11],
-                            'device_timestamp': command_parts[12],
+                            'device_timestamp': command_parts[17],
                             'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
                             'raw_message': '+RESP:' + ','.join(command_parts)
                         }
