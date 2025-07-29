@@ -78,66 +78,68 @@ class MessageHandler:
             
             # Get existing vehicle or create new one
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
+
+            if(existing_vehicle != None):
             
-            # Prepare vehicle data with new structure
-            vehicle_data = {
-                'IMEI': imei,
-                'tsusermanu': datetime.utcnow()
-            }
-            
-            # Update ignition status if available
-            if 'ignition' in parsed_data:
-                vehicle_data['ignicao'] = parsed_data['ignition']
-                if parsed_data['ignition']:
-                    logger.info(f"Ignition ON detected for IMEI {imei}")
-                else:
-                    logger.info(f"Ignition OFF detected for IMEI {imei}")
-            
-            # Update battery level if available
-            if parsed_data.get('battery_level'):
-                try:
-                    battery_voltage = float(parsed_data['battery_level'])
-                    vehicle_data['bateriavoltagem'] = battery_voltage
-                    
-                    # Check for low battery
-                    if battery_voltage < 10.0:
-                        vehicle_data['bateriabaixa'] = True
-                        vehicle_data['ultimoalertabateria'] = datetime.utcnow()
-                        logger.warning(f"Critical battery level for IMEI {imei}: {battery_voltage}V")
-                    elif battery_voltage < 12.0:
-                        vehicle_data['bateriabaixa'] = True
-                        logger.info(f"Low battery level for IMEI {imei}: {battery_voltage}V")
+                # Prepare vehicle data with new structure
+                vehicle_data = {
+                    'IMEI': imei,
+                    'tsusermanu': datetime.utcnow()
+                }
+                
+                # Update ignition status if available
+                if 'ignition' in parsed_data:
+                    vehicle_data['ignicao'] = parsed_data['ignition']
+                    if parsed_data['ignition']:
+                        logger.info(f"Ignition ON detected for IMEI {imei}")
                     else:
-                        vehicle_data['bateriabaixa'] = False
-                except (ValueError, TypeError):
-                    pass
-            
-            # Handle blocking/unblocking commands
-            if parsed_data.get('report_type') == 'GTOUT':
-                # Process blocking command response
-                if parsed_data.get('command_result'):
-                    vehicle_data['bloqueado'] = True
-                    vehicle_data['comandobloqueo'] = None  # Clear pending command
-                    logger.info(f"Vehicle blocking command confirmed for IMEI {imei}")
-            
-            # Handle IP change commands
-            if parsed_data.get('report_type') == 'GTSRI':
-                # Process IP change command response
-                ip_change_success = parsed_data.get('ip_change_success', False)
-                if ip_change_success:
-                    logger.info(f"IP change command confirmed for IMEI {imei}")
-                else:
-                    logger.warning(f"IP change command failed for IMEI {imei}: status {parsed_data.get('status', 'unknown')}")
-            
-            # Merge with existing data if available
-            if existing_vehicle:
-                for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None and key != '_id':
-                        vehicle_data[key] = value
-            
-            # Create vehicle object and save
-            vehicle = Vehicle(**vehicle_data)
-            db_manager.upsert_vehicle(vehicle)
+                        logger.info(f"Ignition OFF detected for IMEI {imei}")
+                
+                # Update battery level if available
+                if parsed_data.get('battery_level'):
+                    try:
+                        battery_voltage = float(parsed_data['battery_level'])
+                        vehicle_data['bateriavoltagem'] = battery_voltage
+                        
+                        # Check for low battery
+                        if battery_voltage < 10.0:
+                            vehicle_data['bateriabaixa'] = True
+                            vehicle_data['ultimoalertabateria'] = datetime.utcnow()
+                            logger.warning(f"Critical battery level for IMEI {imei}: {battery_voltage}V")
+                        elif battery_voltage < 12.0:
+                            vehicle_data['bateriabaixa'] = True
+                            logger.info(f"Low battery level for IMEI {imei}: {battery_voltage}V")
+                        else:
+                            vehicle_data['bateriabaixa'] = False
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Handle blocking/unblocking commands
+                if parsed_data.get('report_type') == 'GTOUT':
+                    # Process blocking command response
+                    if parsed_data.get('command_result'):
+                        vehicle_data['bloqueado'] = True
+                        vehicle_data['comandobloqueo'] = None  # Clear pending command
+                        logger.info(f"Vehicle blocking command confirmed for IMEI {imei}")
+                
+                # Handle IP change commands
+                if parsed_data.get('report_type') == 'GTSRI':
+                    # Process IP change command response
+                    ip_change_success = parsed_data.get('ip_change_success', False)
+                    if ip_change_success:
+                        logger.info(f"IP change command confirmed for IMEI {imei}")
+                    else:
+                        logger.warning(f"IP change command failed for IMEI {imei}: status {parsed_data.get('status', 'unknown')}")
+                
+                # Merge with existing data if available
+                if existing_vehicle:
+                    for key, value in existing_vehicle.items():
+                        if key not in vehicle_data and value is not None and key != '_id':
+                            vehicle_data[key] = value
+                
+                # Create vehicle object and save
+                vehicle = Vehicle(**vehicle_data)
+                db_manager.upsert_vehicle(vehicle)
             
         except Exception as e:
             logger.error(f"Error updating vehicle info for IMEI {parsed_data.get('imei')}: {e}", exc_info=True)

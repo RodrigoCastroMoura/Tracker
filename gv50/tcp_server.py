@@ -139,9 +139,6 @@ class GV50TCPServerCSharpStyle:
             
             connection_id = f"{client_ip}:{client_socket.getpeername()[1]}"
             
-            # Log the message like C#
-            print(f"\nMessage received {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-            print(message)
             logger.debug(f"Received from {connection_id}: {message}")
             
             # Parse message like C# does with split
@@ -222,9 +219,6 @@ class GV50TCPServerCSharpStyle:
                         # Process through message_handler (includes command logic)
                         logger.info(f"DEBUG: Processing GPS message with device_timestamp: {vehicle_data.get('device_timestamp', 'N/A')}")
                         response = message_handler.handle_incoming_message(raw_message, client_ip)
-                        
-                        # Save vehicle data with conversion - GTFRI specific
-                        message_handler.save_vehicle_data(vehicle_data)
                         
                         # Send ACK response
                         if response:
@@ -396,17 +390,18 @@ class GV50TCPServerCSharpStyle:
                                 # Se comando era de desbloqueio (False), agora está desbloqueado
                                 if vehicle.get('comandobloqueo') == True:
                                     blocked = True  # Comando de bloqueio executado
-                                    logger.info(f"Blocking command confirmed for {imei} - Vehicle BLOCKED")
+                                    logger.info(f"ℹ️ Blocking command confirmed for {imei} - Vehicle BLOCKED")
                                 elif vehicle.get('comandobloqueo') == False:
                                     blocked = False  # Comando de desbloqueio executado
-                                    logger.info(f"Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
+                                    logger.info(f"ℹ️ Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
                                 else:
                                     # Comando já foi processado, manter status atual
                                     blocked = vehicle.get('bloqueado', False)
-                                    logger.info(f"Command already processed for {imei}")
+                                    logger.info(f"ℹ️ Command already processed for {imei}")
                                 
                                 message_handler.update_vehicle_blocking(imei, blocked)
-                                logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
+                                
+                                logger.info(f"✅ Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
                         else:
                             # CORREÇÃO: Status "0001" pode ser sucesso em alguns casos
                             # Verificar baseado no protocolo Queclink
