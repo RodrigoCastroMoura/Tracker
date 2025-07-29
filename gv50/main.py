@@ -180,8 +180,8 @@ class GV50TrackerService:
         try:
             if not self.stats['start_time']:
                 return "Unknown"
-            
-            uptime = datetime.now(datetime.UTC) - self.stats['start_time']
+            date = datetime.now(datetime.UTC)
+            uptime = date - self.stats['start_time']
             hours, remainder = divmod(int(uptime.total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
             
