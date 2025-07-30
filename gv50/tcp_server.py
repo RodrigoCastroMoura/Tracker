@@ -102,9 +102,7 @@ class GV50TCPServerCSharpStyle:
                     if response:
                         self.send_data(client_socket, response)
                     
-                    # Check for pending commands and send them (C# Command logic)
-                    # Implementar após integração completa
-                    
+                  
                     # Send heartbeat/keep-alive if needed
                     self.send_heartbeat_if_needed(client_socket, client_ip)
                     
@@ -385,7 +383,6 @@ class GV50TCPServerCSharpStyle:
                         
                         logger.info(f"Processing GTOUT ACK for {imei} with status: '{status}'")
                         
-                        # CORREÇÃO: Update vehicle blocking status like C#
                         # Status "0000" ou vazio significa sucesso na confirmação
                         if status == "0000" or status == "":  # Comando executado com sucesso
                             # Buscar veículo para determinar se foi bloqueio ou desbloqueio
@@ -424,10 +421,10 @@ class GV50TCPServerCSharpStyle:
                             if vehicle and vehicle.get('comandobloqueo') is not None:
                                 if vehicle.get('comandobloqueo') == True:
                                     blocked = True  # Comando de bloqueio executado
-                                    logger.info(f"✅ Blocking command confirmed for {imei} - Vehicle BLOCKED")
+                                    logger.info(f"🔴 Blocking command confirmed for {imei} - Vehicle BLOCKED")
                                 else:
                                     blocked = False  # Comando de desbloqueio executado
-                                    logger.info(f"✅ Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
+                                    logger.info(f"🟢 Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
                                 
                                 message_handler.update_vehicle_blocking(imei, blocked)
                                 
