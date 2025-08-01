@@ -102,7 +102,9 @@ class GV50TCPServerCSharpStyle:
                     if response:
                         self.send_data(client_socket, response)
                     
-                  
+                    # Check for pending commands and send them (C# Command logic)
+                    # Implementar após integração completa
+                    
                     # Send heartbeat/keep-alive if needed
                     self.send_heartbeat_if_needed(client_socket, client_ip)
                     
@@ -262,43 +264,43 @@ class GV50TCPServerCSharpStyle:
                         # Send command if needed
                         self.send_command(client_socket, vehicle_data['imei'])
                         
-                elif command_type == "GTSTT":
-                    if len(command_parts) > 12:
-                        imei = command_parts[2]
-                        motion_status = command_parts[4]
+                #   elif command_type == "GTSTT":
+                #     if len(command_parts) > 12:
+                #         imei = command_parts[2]
+                #         motion_status = command_parts[4]
                         
-                        # Registrar conexão por IMEI se for nova
-                        if imei not in self.connected_devices:
-                            self.connected_devices[imei] = client_ip
-                            logger.info(f"New device connected via GTSTT: IMEI {imei} from {client_ip}")
+                #         # Registrar conexão por IMEI se for nova
+                #         if imei not in self.connected_devices:
+                #             self.connected_devices[imei] = client_ip
+                #             logger.info(f"New device connected via GTSTT: IMEI {imei} from {client_ip}")
                         
-                        # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
-                        logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
-                        self.execute_immediate_commands(client_socket, imei)
+                #         # EXECUÇÃO IMEDIATA: Verificar comandos pendentes A CADA MENSAGEM
+                #         logger.info(f"🚀 VERIFICANDO COMANDOS PENDENTES PARA {imei} (a cada mensagem)")
+                #         self.execute_immediate_commands(client_socket, imei)
                         
-                        # Map fields para GTSTT
-                        vehicle_data = {
-                            'imei': imei,
-                            'motion_status': motion_status,
-                            'speed': command_parts[7],
-                            'altitude': command_parts[9],
-                            'longitude': command_parts[10],
-                            'latitude': command_parts[11],
-                            'device_timestamp': command_parts[17],
-                            'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                            'raw_message': '+RESP:' + ','.join(command_parts)
-                        }
+                #         # Map fields para GTSTT
+                #         vehicle_data = {
+                #             'imei': imei,
+                #             'motion_status': motion_status,
+                #             'speed': command_parts[7],
+                #             'altitude': command_parts[9],
+                #             'longitude': command_parts[10],
+                #             'latitude': command_parts[11],
+                #             'device_timestamp': command_parts[17],
+                #             'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                #             'raw_message': '+RESP:' + ','.join(command_parts)
+                #         }
                         
-                        # Save to database
-                        message_handler.save_vehicle_data(vehicle_data)
+                #         # Save to database
+                #         message_handler.save_vehicle_data(vehicle_data)
                         
-                        # Processar mudança de estado
-                        message_handler.update_vehicle_motion_status(imei, motion_status)
+                #         # Processar mudança de estado
+                #         message_handler.update_vehicle_motion_status(imei, motion_status)
                         
-                        # Send command if needed
-                        self.send_command(client_socket, vehicle_data['imei'])
+                #         # Send command if needed
+                #         self.send_command(client_socket, vehicle_data['imei'])
                         
-                        logger.info(f"GTSTT processed for IMEI {imei}: motion status {motion_status}")
+                #         logger.info(f"GTSTT processed for IMEI {imei}: motion status {motion_status}")
                         
         except Exception as e:
             logger.error(f"Error processing RESP message: {e}")
