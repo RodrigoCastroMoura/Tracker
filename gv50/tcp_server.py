@@ -248,7 +248,7 @@ class GV50TCPServerCSharpStyle:
                             'altitude': command_parts[8],
                             'longitude': command_parts[9],
                             'latitude': command_parts[10],
-                            'device_timestamp': command_parts[11],
+                            'device_timestamp': command_parts[19],
                             'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
                             'ignition': command_type == "GTIGN",
                             'raw_message': '+RESP:' + ','.join(command_parts)
@@ -506,8 +506,7 @@ class GV50TCPServerCSharpStyle:
                                           
                         # Gerar comando exato do C#
                         from config import Config
-                        passWord = Config.DEFAULT_PASSWORD 
-                        comando = f"AT+GTOUT={passWord},{bit},,,,,,0,,,,,,,000{bit}$"
+                        comando = f"AT+GTOUT={Config.DEFAULT_PASSWORD},{bit},,,,,,0,,,,,,,000{bit}$"
                         
                         logger.warning(f"⚡ EXECUÇÃO IMEDIATA: {acao} para {imei}")
                         logger.warning(f"⚡ COMANDO ENVIADO IMEDIATAMENTE: {comando}")
