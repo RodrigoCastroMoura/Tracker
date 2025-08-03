@@ -505,7 +505,9 @@ class GV50TCPServerCSharpStyle:
                     if command_key not in self.commands_sent:
                                           
                         # Gerar comando exato do C#
-                        comando = f"AT+GTOUT={Config.DEFAULT_PASSWORD},{bit},,,,,,0,,,,,,,000{bit}$"
+                        from config import Config
+                        passWord = Config.DEFAULT_PASSWORD 
+                        comando = f"AT+GTOUT={passWord},{bit},,,,,,0,,,,,,,000{bit}$"
                         
                         logger.warning(f"⚡ EXECUÇÃO IMEDIATA: {acao} para {imei}")
                         logger.warning(f"⚡ COMANDO ENVIADO IMEDIATAMENTE: {comando}")
@@ -529,7 +531,7 @@ class GV50TCPServerCSharpStyle:
                     # Comando de troca de IP para GV50 usando GTSRI - formato exato conforme especificação
                     # Formato: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
                     from config import Config
-                    comando_ip_cmd = f"AT+GTSRI=gv50,3,,1,{Config.PRIMARY_SERVER_IP},{Config.PRIMARY_SERVER_PORT},{Config.BACKUP_SERVER_IP},{Config.BACKUP_SERVER_PORT},,60,0,0,0,,0,FFFF$"
+                    comando_ip_cmd = f"AT+GTSRI={Config.DEFAULT_PASSWORD},3,,1,{Config.PRIMARY_SERVER_IP},{Config.PRIMARY_SERVER_PORT},{Config.BACKUP_SERVER_IP},{Config.BACKUP_SERVER_PORT},,60,0,0,0,,0,FFFF$"
                     
                     logger.warning(f"⚡ EXECUÇÃO IMEDIATA: TROCA DE IP (GTSRI) para {imei}")
                     logger.warning(f"⚡ COMANDO GTSRI ENVIADO: {comando_ip_cmd}")

@@ -30,7 +30,6 @@ class Config:
     MAX_CONNECTIONS: int = int(os.getenv('MAX_CONNECTIONS'))
     
     # Servidor Configuration - para comando AT+GTSRI formato correto
-    # Valores padrão conforme especificação: AT+GTSRI=gv50,3,,1,191.252.181.49,8000,191.252.181.49,8000,,60,0,0,0,,0,FFFF$
     PRIMARY_SERVER_IP: str = os.getenv('PRIMARY_SERVER_IP')  # Servidor principal
     PRIMARY_SERVER_PORT: int = int(os.getenv('PRIMARY_SERVER_PORT'))   # Porta principal
     BACKUP_SERVER_IP: str = os.getenv('BACKUP_SERVER_IP')   # Servidor backup (mesmo IP)
