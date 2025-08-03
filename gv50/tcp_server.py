@@ -505,7 +505,7 @@ class GV50TCPServerCSharpStyle:
                     if command_key not in self.commands_sent:
                                           
                         # Gerar comando exato do C#
-                        comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
+                        comando = f"AT+GTOUT={Config.DEFAULT_PASSWORD},{bit},,,,,,0,,,,,,,000{bit}$"
                         
                         logger.warning(f"⚡ EXECUÇÃO IMEDIATA: {acao} para {imei}")
                         logger.warning(f"⚡ COMANDO ENVIADO IMEDIATAMENTE: {comando}")
