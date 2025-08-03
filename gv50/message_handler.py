@@ -166,9 +166,6 @@ class MessageHandler:
                 # Send(handler, "AT+GTOUT=" + DtoVeiculo.Rastreador.ds_senha + "," + bit + ",,,,,,0,,,,,,,000" + bit + "$");
                 comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
                 
-                logger.warning(f"🚨 COMANDO GV50 ENVIADO: {comando}")
-                logger.warning(f"IMEI: {imei} | Ação: {'BLOQUEAR' if bit == '1' else 'DESBLOQUEAR'}")
-                
                 # Enviar comando via TCP (implementar envio direto)
                 self._send_command_to_device(comando, client_ip, imei)
                 
@@ -187,9 +184,6 @@ class MessageHandler:
             
             self.pending_commands[imei].append(command)
             
-            logger.warning(f"📤 COMANDO ADICIONADO À FILA PARA {imei}: {command}")
-            logger.log_outgoing_message(client_ip, imei, f"COMMAND_QUEUED: {command}")
-            
         except Exception as e:
             logger.error(f"Erro ao preparar comando: {e}")
     
@@ -199,7 +193,6 @@ class MessageHandler:
             if hasattr(self, 'pending_commands') and imei in self.pending_commands:
                 if self.pending_commands[imei]:
                     command = self.pending_commands[imei].pop(0)
-                    logger.warning(f"🚀 ENVIANDO COMANDO PARA {imei}: {command}")
                     return command
             return None
         except Exception as e:
@@ -226,14 +219,7 @@ class MessageHandler:
                 mensagem_raw=vehicle_data.get('raw_message', '')
             )
             
-            # Log da conversão para debug
-            if device_datetime_converted:
-                valor = None
-            else:
-                logger.warning(f"❌ Failed to convert device timestamp: {device_timestamp_str}")
-            
             db_manager.insert_vehicle_data(vehicle_record)
-            logger.debug(f"Saved vehicle data for IMEI: {vehicle_data.get('imei')}")
             
         except Exception as e:
             logger.error(f"Error saving vehicle data: {e}")
@@ -252,7 +238,6 @@ class MessageHandler:
                         
             vehicle = Vehicle(**vehicle_data)
             db_manager.upsert_vehicle(vehicle)
-            logger.info(f"Updated ignition status for {imei}: {ignition_status}")
         except Exception as e:
             logger.error(f"Error updating vehicle ignition: {e}")
     

@@ -21,8 +21,8 @@ class GV50Logger:
         # Clear any existing handlers
         self.logger.handlers.clear()
         
-        # Set log level
-        self.logger.setLevel(logging.DEBUG)
+        # Set log level to ERROR only for performance
+        self.logger.setLevel(logging.ERROR)
         
         # Create formatter
         formatter = logging.Formatter(
@@ -30,20 +30,20 @@ class GV50Logger:
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         
-        # Console handler
+        # Console handler - only errors
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(logging.ERROR)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
         
-        # File handler - adicionar logging para arquivo
+        # File handler - apenas erros para melhor desempenho
         log_dir = '../logs'
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         
-        log_filename = f"{log_dir}/gv50_tracker_{datetime.now().strftime('%Y%m%d')}.log"
+        log_filename = f"{log_dir}/gv50_tracker_errors_{datetime.now().strftime('%Y%m%d')}.log"
         file_handler = logging.FileHandler(log_filename, encoding='utf-8')
-        file_handler.setLevel(logging.DEBUG)
+        file_handler.setLevel(logging.ERROR)
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
         
@@ -67,12 +67,12 @@ class GV50Logger:
         self.logger.error(message, exc_info=exc_info)
     
     def log_database_operation(self, operation: str, table: str, imei: str):
-        """Log database operations - simplified"""
-        self.debug(f"DB {operation} on {table} for IMEI {imei}")
+        """Log database operations - disabled for performance"""
+        pass
     
     def log_outgoing_message(self, client_ip: str, imei: str, message: str):
-        """Log outgoing messages"""
-        self.info(f"OUTGOING [{client_ip}] IMEI:{imei} - {message}")
+        """Log outgoing messages - disabled for performance"""
+        pass
 
 # Global logger instance
 logger = GV50Logger()
