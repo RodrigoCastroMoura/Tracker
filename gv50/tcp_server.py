@@ -492,17 +492,18 @@ class GV50TCPServerCSharpStyle:
                     
                     # Criar chave única para comando + IMEI
                     command_key = f"{imei}_{comando_pendente}"
+
+                    # Determinar tipo de comando
+                    if comando_pendente == True:
+                        bit = "1"  # Bloquear
+                        acao = "BLOQUEAR"
+                    else:  # comando_pendente == False
+                        bit = "0"  # Desbloquear 
+                        acao = "DESBLOQUEAR"
                     
                     # Só enviar se ainda não foi enviado nesta sessão
                     if command_key not in self.commands_sent:
-                        # Determinar tipo de comando
-                        if comando_pendente == True:
-                            bit = "1"  # Bloquear
-                            acao = "BLOQUEAR"
-                        else:  # comando_pendente == False
-                            bit = "0"  # Desbloquear 
-                            acao = "DESBLOQUEAR"
-                        
+                                          
                         # Gerar comando exato do C#
                         comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
                         
