@@ -22,19 +22,10 @@ class Vehicle:
     """Vehicle information model - estrutura conforme solicitado"""
     IMEI: str  # Campo obrigatório primeiro
     id: Optional[str] = None
-    dsplaca: Optional[str] = None  # Placa do veículo
-    dsmodelo: Optional[str] = None  # Modelo do veículo
     comandobloqueo: Optional[bool] = None  # True = bloquear, False = desbloquear, None = sem comando
     bloqueado: Optional[bool] = False  # Status atual de bloqueio
     comandotrocarip: Optional[bool] = None  # True = comando para trocar IP pendente
     ignicao: bool = False  # Status da ignição
-    # Campos para monitoramento de bateria
-    bateriavoltagem: Optional[float] = None  # Voltagem atual da bateria
-    bateriabaixa: Optional[bool] = False  # True se bateria estiver baixa
-    ultimoalertabateria: Optional[datetime] = None  # Timestamp do último alerta
-    motion_status: Optional[str] = None  # Status de movimento do GTSTT
-    motion_description: Optional[str] = None  # Descrição do movimento
-    is_moving: Optional[bool] = None  # Se está em movimento
     tsusermanu: Optional[datetime] = None  # Última atualização manual
 
     def to_dict(self) -> Dict[str, Any]:

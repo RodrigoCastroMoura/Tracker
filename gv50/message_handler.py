@@ -95,25 +95,6 @@ class MessageHandler:
                     else:
                         logger.info(f"Ignition OFF detected for IMEI {imei}")
                 
-                # Update battery level if available
-                if parsed_data.get('battery_level'):
-                    try:
-                        battery_voltage = float(parsed_data['battery_level'])
-                        vehicle_data['bateriavoltagem'] = battery_voltage
-                        
-                        # Check for low battery
-                        if battery_voltage < 10.0:
-                            vehicle_data['bateriabaixa'] = True
-                            vehicle_data['ultimoalertabateria'] = datetime.utcnow()
-                            logger.warning(f"Critical battery level for IMEI {imei}: {battery_voltage}V")
-                        elif battery_voltage < 12.0:
-                            vehicle_data['bateriabaixa'] = True
-                            logger.info(f"Low battery level for IMEI {imei}: {battery_voltage}V")
-                        else:
-                            vehicle_data['bateriabaixa'] = False
-                    except (ValueError, TypeError):
-                        pass
-                
                 # Handle blocking/unblocking commands
                 if parsed_data.get('report_type') == 'GTOUT':
                     # Process blocking command response
