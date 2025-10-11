@@ -3,7 +3,7 @@ from typing import Dict, Optional, Any
 from database import db_manager
 from protocol_parser import protocol_parser
 from logger import logger
-from models import VehicleData, Vehicle
+from models import VehicleData
 from datetime_converter import convert_device_timestamp
 
 class MessageHandler:
@@ -137,9 +137,8 @@ class MessageHandler:
                         if key not in vehicle_data and value is not None and key != '_id':
                             vehicle_data[key] = value
                 
-                # Create vehicle object and save
-                vehicle = Vehicle(**vehicle_data)
-                db_manager.upsert_vehicle(vehicle)
+                # Save vehicle data directly
+                db_manager.upsert_vehicle(vehicle_data)
             
         except Exception as e:
             logger.error(f"Error updating vehicle info for IMEI {parsed_data.get('imei')}: {e}", exc_info=True)
@@ -236,8 +235,7 @@ class MessageHandler:
                     if key not in vehicle_data and value is not None and key != '_id':
                         vehicle_data[key] = value
                         
-            vehicle = Vehicle(**vehicle_data)
-            db_manager.upsert_vehicle(vehicle)
+            db_manager.upsert_vehicle(vehicle_data)
         except Exception as e:
             logger.error(f"Error updating vehicle ignition: {e}")
     
@@ -259,8 +257,7 @@ class MessageHandler:
                     if key not in vehicle_data and value is not None and key != '_id':
                         vehicle_data[key] = value
                         
-            vehicle = Vehicle(**vehicle_data)
-            db_manager.upsert_vehicle(vehicle)
+            db_manager.upsert_vehicle(vehicle_data)
             logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
         except Exception as e:
             logger.error(f"Error updating vehicle blocking status: {e}")
@@ -277,8 +274,7 @@ class MessageHandler:
                     if key not in vehicle_data and value is not None and key != '_id':
                         vehicle_data[key] = value
                         
-            vehicle = Vehicle(**vehicle_data)
-            db_manager.upsert_vehicle(vehicle)
+            db_manager.upsert_vehicle(vehicle_data)
             logger.info(f"Set blocking command for {imei}: {'block' if should_block else 'unblock'}")
         except Exception as e:
             logger.error(f"Error setting blocking command: {e}")
@@ -295,8 +291,7 @@ class MessageHandler:
                     if key not in vehicle_data and value is not None and key != '_id':
                         vehicle_data[key] = value
                         
-            vehicle = Vehicle(**vehicle_data)
-            db_manager.upsert_vehicle(vehicle)
+            db_manager.upsert_vehicle(vehicle_data)
             logger.info(f"Set IP change command for {imei}")
         except Exception as e:
             logger.error(f"Error setting IP change command: {e}")
@@ -333,8 +328,7 @@ class MessageHandler:
                     if key not in vehicle_data and value is not None and key != '_id':
                         vehicle_data[key] = value
                         
-            vehicle = Vehicle(**vehicle_data)
-            db_manager.upsert_vehicle(vehicle)
+            db_manager.upsert_vehicle(vehicle_data)
             logger.info(f"Updated motion status for {imei}: {motion_description} (status: {motion_status})")
             
         except Exception as e:

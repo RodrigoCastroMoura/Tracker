@@ -14,36 +14,43 @@ The application employs a modular and service-oriented architecture with a clear
 - **TCP Server**: A custom socket-based server manages persistent connections with GPS devices, handling up to 100 concurrent connections. It includes IP whitelisting/blacklisting for security.
 - **Protocol Parser**: Device-specific parsers (e.g., for Queclink @Track) translate raw protocol messages into structured data, generating acknowledgments.
 - **Message Handler**: This layer processes parsed messages, applies business logic, updates the database, tracks IP changes, and manages vehicle state.
-- **Database Layer**: MongoDB is used as the primary storage, with a unified 'tracker' database supporting various device types.
+- **Database Layer**: MongoDB is used as the primary storage, with a unified 'tracker' database supporting various device types. Uses MongoEngine ODM for the Vehicle model and PyMongo for VehicleData.
 - **Configuration Management**: Environment variables handle all settings for flexible deployment.
-- **Logging System**: A comprehensive system provides configurable logging levels and outputs.
+- **Logging System**: A comprehensive system provides configurable logging levels and outputs (optimized to ERROR level only for performance).
 
 ### Key Design Decisions
 - **Concurrency Model**: Each GPS device connection is handled in its own thread to support concurrent devices.
 - **Data Storage**: MongoDB was chosen for its flexible schema and high write performance, storing tracking records (`vehicle_data`) and device information (`vehicles`).
+- **ORM/ODM Pattern**: MongoEngine used for Vehicle model with BaseDocument pattern providing audit fields (created_at, created_by, updated_at, updated_by). VehicleData uses dataclass for lightweight tracking records.
 - **Configuration**: All settings are managed via environment variables.
 - **Protocol Abstraction**: The design allows for easy integration of new device protocols.
 - **Command System**: Implements immediate command execution (e.g., blocking/unblocking, IP changes) via TCP, supporting bidirectional communication and real-time status updates.
 - **Timestamp Handling**: Proper conversion of device timestamps to datetime objects.
+- **Performance Optimization**: Logging optimized to ERROR level only for improved I/O performance.
 
 ### Key Components
 - **GV50 Service**: Contains components like `tcp_server.py`, `protocol_parser.py`, and `message_handler.py`.
-- **Database Manager (`database.py`)**: Manages MongoDB connections, data models, and indexing.
-- **Data Models (`models.py`)**: Defines `VehicleData` for location records and `Vehicle` for device/vehicle status.
+- **Database Manager (`database.py`)**: Manages both PyMongo and MongoEngine connections, data models, and indexing.
+- **Data Models (`models.py`)**: 
+  - `BaseDocument`: Abstract MongoEngine Document with audit fields (created_at, updated_at, created_by, updated_by)
+  - `Vehicle`: MongoEngine Document extending BaseDocument for device/vehicle management with fields like IMEI, dsplaca, bloqueado, ignicao, etc.
+  - `VehicleData`: Dataclass for lightweight location/tracking records
 - **Configuration (`config.py`)**: Handles environment-based settings.
-- **Logging (`logger.py`)**: Centralized logging for all services.
+- **Logging (`logger.py`)**: Centralized logging for all services (ERROR level only).
 
 ## External Dependencies
 
 ### Database
 - **MongoDB**: Primary data store.
-  - Driver: PyMongo
+  - Drivers: PyMongo + MongoEngine ODM
   - Database Name: `tracker`
   - Collections: `vehicle_data`, `vehicles`
   - Connection String: `mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/tracker`
+  - Vehicle model uses MongoEngine with unique indexes on IMEI and dsplaca (sparse)
 
 ### Python Packages
-- `pymongo`: For MongoDB interaction.
+- `pymongo`: For direct MongoDB interaction (VehicleData records).
+- `mongoengine`: ODM for Vehicle model with BaseDocument pattern.
 - `python-dotenv`: For environment variable management.
 - `socket`: For TCP network communication.
 - `threading`: For concurrent connection handling.

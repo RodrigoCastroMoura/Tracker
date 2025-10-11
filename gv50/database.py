@@ -1,5 +1,6 @@
 from pymongo import MongoClient, ASCENDING
 from pymongo.errors import ConnectionFailure, OperationFailure
+from mongoengine import connect, disconnect
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from config import Config
@@ -18,10 +19,15 @@ class DatabaseManager:
     def connect(self):
         """Connect to MongoDB"""
         try:
+            # Connect PyMongo for VehicleData operations
             self.client = MongoClient(Config.MONGODB_URI)
             self.db = self.client[Config.DATABASE_NAME]
             # Test connection
             self.client.admin.command('ping')
+            
+            # Connect MongoEngine for Vehicle model
+            connect(host=Config.MONGODB_URI, db=Config.DATABASE_NAME)
+            
             logger.info(f"Connected to MongoDB database: {Config.DATABASE_NAME}")
         except ConnectionFailure as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
@@ -65,37 +71,40 @@ class DatabaseManager:
             logger.error(f"Error inserting vehicle data for IMEI {vehicle_data.imei}: {e}")
             return False
     
-    def upsert_vehicle(self, vehicle: Vehicle) -> bool:
-        """Update or insert vehicle information"""
+    def upsert_vehicle(self, vehicle_data: Dict[str, Any]) -> bool:
+        """Update or insert vehicle information using MongoEngine"""
         try:
-            if self.db is None:
+            imei = vehicle_data.get('IMEI')
+            if not imei:
+                logger.error("Cannot upsert vehicle without IMEI")
                 return False
-            collection = self.db['vehicles']
-            filter_query = {'IMEI': vehicle.IMEI}  # Usar novo campo IMEI
-            update_data = vehicle.to_dict()
             
-            result = collection.update_one(
-                filter_query,
-                {'$set': update_data},
-                upsert=True
-            )
+            # Try to get existing vehicle
+            existing_vehicle = Vehicle.objects(IMEI=imei).first()
             
-            operation = 'UPDATE' if result.matched_count > 0 else 'INSERT'
-            logger.debug(f"Upserted vehicle for IMEI: {vehicle.IMEI}")
+            if existing_vehicle:
+                # Update existing vehicle
+                for key, value in vehicle_data.items():
+                    if hasattr(existing_vehicle, key):
+                        setattr(existing_vehicle, key, value)
+                existing_vehicle.save()
+            else:
+                # Create new vehicle
+                new_vehicle = Vehicle(**vehicle_data)
+                new_vehicle.save()
+            
             return True
         except Exception as e:
-            logger.error(f"Error upserting vehicle for IMEI {vehicle.IMEI}: {e}")
+            logger.error(f"Error upserting vehicle for IMEI {imei}: {e}")
             return False
     
     def get_vehicle_by_imei(self, imei: str) -> Optional[Dict[str, Any]]:
-        """Get vehicle information by IMEI"""
+        """Get vehicle information by IMEI using MongoEngine"""
         try:
-            if self.db is None:
-                return None
-            collection = self.db['vehicles']
-            vehicle = collection.find_one({'IMEI': imei})
-            logger.debug(f"Retrieved vehicle for IMEI: {imei}")
-            return vehicle
+            vehicle = Vehicle.objects(IMEI=imei).first()
+            if vehicle:
+                return vehicle.to_dict()
+            return None
         except Exception as e:
             logger.error(f"Error getting vehicle for IMEI {imei}: {e}")
             return None
@@ -130,6 +139,7 @@ class DatabaseManager:
         """Close database connection"""
         if self.client:
             self.client.close()
+            disconnect()  # Disconnect MongoEngine
             logger.info("Database connection closed")
     
     def close_connection(self):
