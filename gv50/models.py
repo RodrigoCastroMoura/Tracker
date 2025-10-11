@@ -20,11 +20,12 @@ class VehicleData:
 
 class BaseDocument(Document):
     """Base document class with audit fields"""
-    meta = {'abstract': True}
+    meta = {
+        'abstract': True,
+        'strict': False  # Ignore unknown fields in database (like old created_by/updated_by)
+    }
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
-    created_by = StringField(required=False)  # Optional field for backward compatibility
-    updated_by = StringField(required=False)  # Optional field for backward compatibility
 
     def save(self, *args, **kwargs):
         if not self.created_at:
@@ -38,8 +39,6 @@ class BaseDocument(Document):
             'id': str(self.id) if hasattr(self, 'id') and self.id else None,
             'created_at': self.created_at.isoformat() if hasattr(self, 'created_at') and self.created_at else None,
             'updated_at': self.updated_at.isoformat() if hasattr(self, 'updated_at') and self.updated_at else None,
-            'created_by': self.created_by if hasattr(self, 'created_by') else None,
-            'updated_by': self.updated_by if hasattr(self, 'updated_by') else None,
         }
         return result
 
