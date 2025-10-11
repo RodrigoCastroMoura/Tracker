@@ -83,6 +83,17 @@ class DatabaseManager:
             filtered_data = {k: v for k, v in vehicle_data.items() 
                            if k not in ['created_by', 'updated_by', '_id']}
             
+            # Convert date strings to datetime objects for DateTimeFields
+            date_fields = ['created_at', 'updated_at', 'ultimoalertabateria', 'tsusermanu']
+            for field in date_fields:
+                if field in filtered_data and isinstance(filtered_data[field], str):
+                    try:
+                        from dateutil import parser as date_parser
+                        filtered_data[field] = date_parser.parse(filtered_data[field])
+                    except:
+                        # If parsing fails, remove the field
+                        filtered_data.pop(field, None)
+            
             # Try to get existing vehicle
             existing_vehicle = Vehicle.objects(IMEI=imei).first()
             
