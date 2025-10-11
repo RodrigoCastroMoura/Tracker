@@ -22,9 +22,7 @@ class BaseDocument(Document):
     """Base document class with audit fields"""
     meta = {'abstract': True}
     created_at = DateTimeField(default=datetime.utcnow)
-    created_by = ReferenceField('User', required=False)  # Optional to handle system-created records
     updated_at = DateTimeField(default=datetime.utcnow)
-    updated_by = ReferenceField('User', required=False)
 
     def save(self, *args, **kwargs):
         if not self.created_at:
@@ -39,17 +37,6 @@ class BaseDocument(Document):
             'created_at': self.created_at.isoformat() if hasattr(self, 'created_at') and self.created_at else None,
             'updated_at': self.updated_at.isoformat() if hasattr(self, 'updated_at') and self.updated_at else None,
         }
-        
-        if hasattr(self, 'created_by') and self.created_by:
-            result['created_by'] = str(self.created_by.id) if hasattr(self.created_by, 'id') else None
-        else:
-            result['created_by'] = None
-            
-        if hasattr(self, 'updated_by') and self.updated_by:
-            result['updated_by'] = str(self.updated_by.id) if hasattr(self.updated_by, 'id') else None
-        else:
-            result['updated_by'] = None
-            
         return result
 
 class Vehicle(BaseDocument):

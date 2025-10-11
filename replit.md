@@ -21,7 +21,7 @@ The application employs a modular and service-oriented architecture with a clear
 ### Key Design Decisions
 - **Concurrency Model**: Each GPS device connection is handled in its own thread to support concurrent devices.
 - **Data Storage**: MongoDB was chosen for its flexible schema and high write performance, storing tracking records (`vehicle_data`) and device information (`vehicles`).
-- **ORM/ODM Pattern**: MongoEngine used for Vehicle model with BaseDocument pattern providing audit fields (created_at, created_by, updated_at, updated_by). VehicleData uses dataclass for lightweight tracking records.
+- **ORM/ODM Pattern**: MongoEngine used for Vehicle model with BaseDocument pattern providing audit fields (created_at, updated_at). VehicleData uses dataclass for lightweight tracking records.
 - **Configuration**: All settings are managed via environment variables.
 - **Protocol Abstraction**: The design allows for easy integration of new device protocols.
 - **Command System**: Implements immediate command execution (e.g., blocking/unblocking, IP changes) via TCP, supporting bidirectional communication and real-time status updates.
@@ -32,7 +32,7 @@ The application employs a modular and service-oriented architecture with a clear
 - **GV50 Service**: Contains components like `tcp_server.py`, `protocol_parser.py`, and `message_handler.py`.
 - **Database Manager (`database.py`)**: Manages both PyMongo and MongoEngine connections, data models, and indexing.
 - **Data Models (`models.py`)**: 
-  - `BaseDocument`: Abstract MongoEngine Document with audit fields (created_at, updated_at, created_by, updated_by)
+  - `BaseDocument`: Abstract MongoEngine Document with audit fields (created_at, updated_at)
   - `Vehicle`: MongoEngine Document extending BaseDocument for device/vehicle management with fields like IMEI, dsplaca, bloqueado, ignicao, etc.
   - `VehicleData`: Dataclass for lightweight location/tracking records
 - **Configuration (`config.py`)**: Handles environment-based settings.
