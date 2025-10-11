@@ -79,18 +79,22 @@ class DatabaseManager:
                 logger.error("Cannot upsert vehicle without IMEI")
                 return False
             
+            # Filter out incompatible fields from old database schema
+            filtered_data = {k: v for k, v in vehicle_data.items() 
+                           if k not in ['created_by', 'updated_by', '_id']}
+            
             # Try to get existing vehicle
             existing_vehicle = Vehicle.objects(IMEI=imei).first()
             
             if existing_vehicle:
                 # Update existing vehicle
-                for key, value in vehicle_data.items():
+                for key, value in filtered_data.items():
                     if hasattr(existing_vehicle, key):
                         setattr(existing_vehicle, key, value)
                 existing_vehicle.save()
             else:
                 # Create new vehicle
-                new_vehicle = Vehicle(**vehicle_data)
+                new_vehicle = Vehicle(**filtered_data)
                 new_vehicle.save()
             
             return True
