@@ -115,7 +115,7 @@ class MessageHandler:
                 # Merge with existing data if available
                 if existing_vehicle:
                     for key, value in existing_vehicle.items():
-                        if key not in vehicle_data and value is not None and key != '_id':
+                        if key not in vehicle_data and value is not None and key not in ['_id', 'created_at', 'updated_at']:
                             vehicle_data[key] = value
                 
                 # Create vehicle object and save
@@ -214,7 +214,7 @@ class MessageHandler:
             vehicle_data = {'IMEI': imei, 'ignicao': ignition_status, 'tsusermanu': datetime.utcnow()}
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None and key != '_id':
+                    if key not in vehicle_data and value is not None and key not in ['_id', 'created_at', 'updated_at']:
                         vehicle_data[key] = value
                         
             vehicle = Vehicle(**vehicle_data)
@@ -237,7 +237,7 @@ class MessageHandler:
             
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None and key != '_id':
+                    if key not in vehicle_data and value is not None and key not in ['_id', 'created_at', 'updated_at']:
                         vehicle_data[key] = value
                         
             vehicle = Vehicle(**vehicle_data)
@@ -255,7 +255,7 @@ class MessageHandler:
             vehicle_data = {'IMEI': imei, 'comandobloqueo': should_block, 'tsusermanu': datetime.utcnow()}
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None and key != '_id':
+                    if key not in vehicle_data and value is not None and key not in ['_id', 'created_at', 'updated_at']:
                         vehicle_data[key] = value
                         
             vehicle = Vehicle(**vehicle_data)
@@ -273,7 +273,7 @@ class MessageHandler:
             vehicle_data = {'IMEI': imei, 'comandotrocarip': True, 'tsusermanu': datetime.utcnow()}
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None and key != '_id':
+                    if key not in vehicle_data and value is not None and key not in ['_id', 'created_at', 'updated_at']:
                         vehicle_data[key] = value
                         
             vehicle = Vehicle(**vehicle_data)
@@ -311,7 +311,7 @@ class MessageHandler:
             
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
-                    if key not in vehicle_data and value is not None and key != '_id':
+                    if key not in vehicle_data and value is not None and key not in ['_id', 'created_at', 'updated_at']:
                         vehicle_data[key] = value
                         
             vehicle = Vehicle(**vehicle_data)

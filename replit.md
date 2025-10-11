@@ -3,6 +3,9 @@
 ## Overview
 This project is a Python-based GPS tracking service designed to communicate with various GPS tracking devices. Its primary purpose is to receive, process, and store location and event data from these devices. The service features a robust TCP server capable of handling multiple device types, starting with GV50 devices using the Queclink @Track protocol. The vision is to create a unified tracking platform that can support a diverse range of GPS hardware, providing real-time data and control capabilities for vehicle fleets and asset management.
 
+## Recent Changes
+- **2025-10-11**: Fixed database metadata field conflict - excluded `created_at` and `updated_at` fields from Vehicle model initialization to prevent TypeErrors when merging MongoDB documents with existing vehicle data.
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
