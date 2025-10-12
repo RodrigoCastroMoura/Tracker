@@ -7,7 +7,7 @@ import sys
 
 # Force correct configuration before importing other modules
 os.environ['SERVER_PORT'] = '8000'  # GV50 devices connect on port 8000
-os.environ['DATABASE_NAME'] = 'track'  # Use correct database
+os.environ['DATABASE_NAME'] = 'tracker'  # Use correct database
 
 # Now import and start the service
 from main import GV50TrackerService
