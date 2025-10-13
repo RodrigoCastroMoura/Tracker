@@ -327,7 +327,7 @@ class GV50TCPServerCSharpStyle:
                                     'longitude': command_parts[11],
                                     'latitude': command_parts[12],
                                     'device_timestamp': command_parts[13],
-                                    'server_timestamp': device_time,  # Use device time
+                                    'server_timestamp': command_parts[13],  # Use device time
                                     'raw_message': '+BUFF:' + ','.join(command_parts)
                                 }
                                 
@@ -527,7 +527,7 @@ class GV50TCPServerCSharpStyle:
                         del vehicle_data['_id']
                     vehicle_data['comandotrocarip'] = False
                     from datetime import datetime
-                    vehicle_data['tsusermanu'] = datetime.now()
+                    vehicle_data['tsusermanu'] = datetime.utcnow()
                     
                     from models import Vehicle
                     updated_vehicle = Vehicle(**vehicle_data)
