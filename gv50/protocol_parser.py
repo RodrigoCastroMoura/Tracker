@@ -397,7 +397,7 @@ class QueclinkProtocolParser:
                 return None
             
             # Generate timestamp
-            timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
             
             # Generate simple checksum (simplified for this implementation)
             checksum = "11F0"

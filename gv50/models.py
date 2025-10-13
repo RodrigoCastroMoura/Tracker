@@ -24,13 +24,13 @@ class BaseDocument(Document):
         'abstract': True,
         'strict': False  # Ignore unknown fields in database (like old created_by/updated_by)
     }
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=datetime.now)
+    updated_at = DateTimeField(default=datetime.now)
 
     def save(self, *args, **kwargs):
         if not self.created_at:
-            self.created_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+            self.created_at = datetime.now()
+        self.updated_at = datetime.now()
         return super(BaseDocument, self).save(*args, **kwargs)
 
     def to_dict(self):

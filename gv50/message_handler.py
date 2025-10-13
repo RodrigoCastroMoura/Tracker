@@ -33,7 +33,7 @@ class MessageHandler:
             self.device_ips[imei] = client_ip
             
             # Create vehicle data record - apenas dados de localização
-            current_time = datetime.utcnow()
+            current_time = datetime.now()
             
             # Converter device timestamp para datetime
             device_timestamp_str = parsed_data.get('device_timestamp', '')
@@ -84,7 +84,7 @@ class MessageHandler:
                 # Prepare vehicle data with new structure
                 vehicle_data = {
                     'IMEI': imei,
-                    'tsusermanu': datetime.utcnow()
+                    'tsusermanu': datetime.now()
                 }
                 
                 # Update ignition status if available
@@ -104,7 +104,7 @@ class MessageHandler:
                         # Check for low battery
                         if battery_voltage < 10.0:
                             vehicle_data['bateriabaixa'] = True
-                            vehicle_data['ultimoalertabateria'] = datetime.utcnow()
+                            vehicle_data['ultimoalertabateria'] = datetime.now()
                             logger.warning(f"Critical battery level for IMEI {imei}: {battery_voltage}V")
                         elif battery_voltage < 12.0:
                             vehicle_data['bateriabaixa'] = True
@@ -202,7 +202,7 @@ class MessageHandler:
         """Save vehicle data to database - C# style method"""
         try:
             # Convert dict to VehicleData object
-            current_time = datetime.utcnow()
+            current_time = datetime.now()
             
             # Converter data do dispositivo para datetime
             device_timestamp_str = vehicle_data.get('device_timestamp', '')
@@ -229,7 +229,7 @@ class MessageHandler:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             
             # Merge with existing data
-            vehicle_data = {'IMEI': imei, 'ignicao': ignition_status, 'tsusermanu': datetime.utcnow()}
+            vehicle_data = {'IMEI': imei, 'ignicao': ignition_status, 'tsusermanu': datetime.now()}
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
                     if key not in vehicle_data and value is not None and key != '_id':
@@ -249,7 +249,7 @@ class MessageHandler:
                 'IMEI': imei, 
                 'bloqueado': blocked, 
                 'comandobloqueo': None,  # Clear pending command ( not None)
-                'tsusermanu': datetime.utcnow()
+                'tsusermanu': datetime.now()
             }
             
             if existing_vehicle:
@@ -268,7 +268,7 @@ class MessageHandler:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             
             # Merge with existing data
-            vehicle_data = {'IMEI': imei, 'comandobloqueo': should_block, 'tsusermanu': datetime.utcnow()}
+            vehicle_data = {'IMEI': imei, 'comandobloqueo': should_block, 'tsusermanu': datetime.now()}
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
                     if key not in vehicle_data and value is not None and key != '_id':
@@ -285,7 +285,7 @@ class MessageHandler:
             existing_vehicle = db_manager.get_vehicle_by_imei(imei)
             
             # Merge with existing data
-            vehicle_data = {'IMEI': imei, 'comandotrocarip': True, 'tsusermanu': datetime.utcnow()}
+            vehicle_data = {'IMEI': imei, 'comandotrocarip': True, 'tsusermanu': datetime.now()}
             if existing_vehicle:
                 for key, value in existing_vehicle.items():
                     if key not in vehicle_data and value is not None and key != '_id':
@@ -320,7 +320,7 @@ class MessageHandler:
                 'motion_status': motion_status,
                 'motion_description': motion_description,
                 'is_moving': is_moving,
-                'tsusermanu': datetime.utcnow()
+                'tsusermanu': datetime.now()
             }
             
             if existing_vehicle:

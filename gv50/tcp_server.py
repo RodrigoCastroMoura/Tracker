@@ -527,7 +527,7 @@ class GV50TCPServerCSharpStyle:
                         del vehicle_data['_id']
                     vehicle_data['comandotrocarip'] = False
                     from datetime import datetime
-                    vehicle_data['tsusermanu'] = datetime.utcnow()
+                    vehicle_data['tsusermanu'] = datetime.now()
                     
                     from models import Vehicle
                     updated_vehicle = Vehicle(**vehicle_data)

@@ -38,7 +38,7 @@ class GV50TrackerService:
             print("=" * 60)
             
             self.running = True
-            self.stats['start_time'] = datetime.utcnow()
+            self.stats['start_time'] = datetime.now()
             
             # Start GV50 service
             if self._start_gv50_service():
@@ -127,7 +127,7 @@ class GV50TrackerService:
                 
                 # Update statistics
                 if connection_count > 0:
-                    self.stats['last_activity'] = datetime.now(timezone.utc)  # Mudança aqui
+                    self.stats['last_activity'] = datetime.now()
                 
                 # Health check
                 if not self._gv50_health_check():
@@ -180,7 +180,7 @@ class GV50TrackerService:
         try:
             if not self.stats['start_time']:
                 return "Unknown"
-            date = datetime.now(datetime.UTC)
+            date = datetime.now()
             uptime = date - self.stats['start_time']
             hours, remainder = divmod(int(uptime.total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
