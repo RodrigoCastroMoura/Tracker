@@ -386,9 +386,9 @@ class GV50TCPServerCSharpStyle:
                                 # Se comando era de bloqueio (True), agora está bloqueado
                                 # Se comando era de desbloqueio (False), agora está desbloqueado
                                 if vehicle.get('comandobloqueo') == True:
-                                    blocked = True  # Comando de bloqueio executado
+                                    blocked = False  # Comando de bloqueio executado
                                 elif vehicle.get('comandobloqueo') == False:
-                                    blocked = False  # Comando de desbloqueio executado
+                                    blocked = True  # Comando de desbloqueio executado
                                 else:
                                     # Comando já foi processado, manter status atual
                                     blocked = vehicle.get('bloqueado', False)
