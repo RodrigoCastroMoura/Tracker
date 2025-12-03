@@ -40,12 +40,9 @@ externalPort = 80
 localPort = 37241
 externalPort = 3000
 
+[[ports]]
+localPort = 42899
+externalPort = 3001
+
 [agent]
 expertMode = true
-
-[userenv]
-
-[userenv.shared]
-PUSH_NOTIFICATIONS_ENABLED = "true"
-FIREBASE_CREDENTIALS_PATH = "firebase-credentials.json"
-FIREBASE_DEFAULT_TOPIC = "vehicle_alerts"
