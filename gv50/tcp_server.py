@@ -327,7 +327,7 @@ class GV50TCPServerCSharpStyle:
                                     'longitude': command_parts[11],
                                     'latitude': command_parts[12],
                                     'device_timestamp': command_parts[13],
-                                    'server_timestamp': command_parts[13],  # Use device time
+                                    'server_timestamp': device_time,  # Use device time
                                     'raw_message': '+BUFF:' + ','.join(command_parts)
                                 }
                                 
@@ -386,9 +386,9 @@ class GV50TCPServerCSharpStyle:
                                 # Se comando era de bloqueio (True), agora está bloqueado
                                 # Se comando era de desbloqueio (False), agora está desbloqueado
                                 if vehicle.get('comandobloqueo') == True:
-                                    blocked = False  # Comando de bloqueio executado
+                                    blocked = True  # Comando de bloqueio executado
                                 elif vehicle.get('comandobloqueo') == False:
-                                    blocked = True  # Comando de desbloqueio executado
+                                    blocked = False  # Comando de desbloqueio executado
                                 else:
                                     # Comando já foi processado, manter status atual
                                     blocked = vehicle.get('bloqueado', False)
@@ -527,7 +527,7 @@ class GV50TCPServerCSharpStyle:
                         del vehicle_data['_id']
                     vehicle_data['comandotrocarip'] = False
                     from datetime import datetime
-                    vehicle_data['tsusermanu'] = datetime.utcnow()
+                    vehicle_data['tsusermanu'] = datetime.now()
                     
                     from models import Vehicle
                     updated_vehicle = Vehicle(**vehicle_data)

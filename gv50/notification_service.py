@@ -68,23 +68,23 @@ class NotificationService:
         """Check if push notifications are enabled and initialized"""
         return self.enabled and self.initialized and FIREBASE_AVAILABLE
     
-    def _get_customer_fcm_token(self, imei: str) -> Optional[str]:
-        """Get FCM token from customer associated with vehicle"""
+    def _get_vehicle_fcm_token(self, imei: str) -> Optional[str]:
+        """Get FCM token from vehicle record by IMEI"""
         try:
-            customer = db_manager.get_customer_for_vehicle(imei)
-            if customer:
-                return customer.get('fcm_token')
+            vehicle = db_manager.get_vehicle_by_imei(imei)
+            if vehicle:
+                return vehicle.get('token_fcm') or vehicle.get('fcm_token')
             return None
         except Exception as e:
             logger.error(f"Error getting FCM token for IMEI {imei}: {e}")
             return None
     
     def _send_notification(self, imei: str, title: str, body: str, data: Dict[str, str]) -> bool:
-        """Send notification to customer's FCM token or fallback to topic"""
+        """Send notification to vehicle's FCM token or fallback to topic"""
         if not self.is_enabled():
             return False
         
-        token = self._get_customer_fcm_token(imei)
+        token = self._get_vehicle_fcm_token(imei)
         
         if token:
             return self.send_to_token(token, title, body, data)

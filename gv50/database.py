@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from config import Config
 from logger import logger
-from models import VehicleData, Vehicle, Customer
+from models import VehicleData, Vehicle
 
 class DatabaseManager:
     """Database manager for MongoDB operations - apenas duas tabelas"""
@@ -166,33 +166,11 @@ class DatabaseManager:
         try:
             if self.db is None:
                 return []
+            # Para simplicidade, retornamos lista vazia - comandos podem ser implementados futuramente
             return []
         except Exception as e:
             logger.error(f"Error getting pending commands for IMEI {imei}: {e}")
             return []
-    
-    def get_customer_by_id(self, customer_id: str) -> Optional[Dict[str, Any]]:
-        """Get customer by ID"""
-        try:
-            from bson import ObjectId
-            customer = Customer.objects(id=ObjectId(customer_id)).first()
-            if customer:
-                return customer.to_dict()
-            return None
-        except Exception as e:
-            logger.error(f"Error getting customer by ID {customer_id}: {e}")
-            return None
-    
-    def get_customer_for_vehicle(self, imei: str) -> Optional[Dict[str, Any]]:
-        """Get the customer associated with a vehicle by IMEI"""
-        try:
-            vehicle = Vehicle.objects(IMEI=imei).first()
-            if vehicle and vehicle.customer_id:
-                return vehicle.customer_id.to_dict()
-            return None
-        except Exception as e:
-            logger.error(f"Error getting customer for vehicle IMEI {imei}: {e}")
-            return None
 
-
+# Global database manager instance
 db_manager = DatabaseManager()

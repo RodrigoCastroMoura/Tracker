@@ -115,10 +115,10 @@ class QueclinkProtocolParser:
                 'gps_accuracy': fields[5] if len(fields) > 5 else '0',
                 'speed': fields[8] if len(fields) > 8 else '0',  # comando[8] no C# para GTFRI
                 'course': fields[7] if len(fields) > 7 else '0',
-                'altitude': fields[10] if len(fields) > 10 else '0',  # altitude
-                'longitude': fields[11] if len(fields) > 11 else '0',  # longitude  
-                'latitude': fields[12] if len(fields) > 12 else '0',  # latitude
-                'gps_timestamp': fields[13] if len(fields) > 13 else '',  # Data/hora GPS
+                'altitude': fields[9] if len(fields) > 9 else '0',  # altitude
+                'longitude': fields[10] if len(fields) > 10 else '0',  # longitude  
+                'latitude': fields[11] if len(fields) > 11 else '0',  # latitude
+                'gps_timestamp': fields[12] if len(fields) > 12 else '',  # Data/hora GPS
                 'device_timestamp': self._extract_device_timestamp(fields),  # Data/hora do dispositivo (final)
                 'mcc': fields[14] if len(fields) > 14 else '',
                 'mnc': fields[15] if len(fields) > 15 else '',

@@ -7,76 +7,50 @@ This project is a Python-based GPS tracking service designed to communicate with
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
-The application follows **Clean Architecture** principles with clear separation of concerns across layers.
-
-### Project Structure (Clean Architecture)
-```
-gv50/
-├── domain/                    # Domain Layer - Business Logic
-│   ├── entities/              # Domain entities (Customer, Vehicle)
-│   └── interfaces/            # Repository and gateway interfaces
-├── application/               # Application Layer - Use Cases
-│   ├── services/              # Application services (NotificationService)
-│   └── use_cases/             # Business use cases
-├── infrastructure/            # Infrastructure Layer - External Concerns
-│   ├── database/              # MongoDB models and repositories
-│   ├── firebase/              # Firebase notification gateway
-│   └── config/                # Configuration management
-├── presentation/              # Presentation Layer - External Interfaces
-│   └── tcp/                   # TCP server handlers
-└── [legacy files]             # Original files (being migrated)
-```
+The application employs a modular and service-oriented architecture with a clear separation of concerns.
 
 ### Backend Architecture
-- **Clean Architecture**: Organized in layers (Domain, Application, Infrastructure, Presentation)
-- **TCP Server**: Custom socket-based server managing persistent connections with GPS devices
-- **Protocol Parser**: Device-specific parsers translating raw protocol messages
-- **Message Handler**: Processes parsed messages and applies business logic
-- **Database Layer**: MongoDB with MongoEngine ODM for models
-- **Notification System**: Firebase Cloud Messaging for push notifications
+- **Service-Based Organization**: Each device type (e.g., GV50) has its own dedicated, self-contained service folder.
+- **TCP Server**: A custom socket-based server manages persistent connections with GPS devices, handling up to 100 concurrent connections. It includes IP whitelisting/blacklisting for security.
+- **Protocol Parser**: Device-specific parsers (e.g., for Queclink @Track) translate raw protocol messages into structured data, generating acknowledgments.
+- **Message Handler**: This layer processes parsed messages, applies business logic, updates the database, tracks IP changes, and manages vehicle state.
+- **Database Layer**: MongoDB is used as the primary storage, with a unified 'tracker' database supporting various device types. Uses MongoEngine ODM for the Vehicle model and PyMongo for VehicleData.
+- **Configuration Management**: Environment variables handle all settings for flexible deployment.
+- **Logging System**: A comprehensive system provides configurable logging levels and outputs (optimized to ERROR level only for performance).
 
 ### Key Design Decisions
-- **Clean Architecture**: Separation of concerns with dependency inversion
-- **Domain-Driven Design**: Customer and Vehicle as core domain entities
-- **Repository Pattern**: Interfaces for data access abstraction
-- **Gateway Pattern**: Notification gateway interface for external services
-- **Concurrency Model**: Thread-per-connection for GPS device handling
+- **Concurrency Model**: Each GPS device connection is handled in its own thread to support concurrent devices.
+- **Data Storage**: MongoDB was chosen for its flexible schema and high write performance, storing tracking records (`vehicle_data`) and device information (`vehicles`).
+- **ORM/ODM Pattern**: MongoEngine used for Vehicle model with BaseDocument pattern providing audit fields (created_at, updated_at). VehicleData uses dataclass for lightweight tracking records.
+- **Configuration**: All settings are managed via environment variables.
+- **Protocol Abstraction**: The design allows for easy integration of new device protocols.
+- **Command System**: Implements immediate command execution (e.g., blocking/unblocking, IP changes) via TCP, supporting bidirectional communication and real-time status updates.
+- **Timestamp Handling**: Proper conversion of device timestamps to datetime objects.
+- **Performance Optimization**: Logging optimized to ERROR level only for improved I/O performance.
 
-### Data Models
-
-#### Customer (Read-Only)
-- `id`: Unique identifier
-- `name`: Customer name
-- `email`: Email address
-- `document`: CPF/CNPJ document
-- `phone`: Phone number
-- `fcm_token`: Firebase Cloud Messaging token for push notifications
-
-#### Vehicle
-- `IMEI`: Device identifier (required)
-- `dsplaca`: License plate
-- `customer_id`: Reference to Customer (owner)
-- `bloqueado`: Blocking status
-- `ignicao`: Ignition status
-- `bateriavoltagem`: Battery voltage
-- Other tracking fields...
+### Key Components
+- **GV50 Service**: Contains components like `tcp_server.py`, `protocol_parser.py`, and `message_handler.py`.
+- **Database Manager (`database.py`)**: Manages both PyMongo and MongoEngine connections, data models, and indexing.
+- **Data Models (`models.py`)**: 
+  - `BaseDocument`: Abstract MongoEngine Document with audit fields (created_at, updated_at)
+  - `Vehicle`: MongoEngine Document extending BaseDocument for device/vehicle management with fields like IMEI, dsplaca, bloqueado, ignicao, etc.
+  - `VehicleData`: Dataclass for lightweight location/tracking records
+- **Configuration (`config.py`)**: Handles environment-based settings.
+- **Logging (`logger.py`)**: Centralized logging for all services (ERROR level only).
+- **Notification Service (`notification_service.py`)**: Firebase Cloud Messaging integration for push notifications.
 
 ### Push Notifications (Firebase)
 The system supports push notifications via Firebase Cloud Messaging (FCM) for key vehicle events:
-- **Ignition On/Off**: Notifies when vehicle ignition changes state
-- **Vehicle Blocking/Unblocking**: Notifies when blocking commands are confirmed
-- **Low Battery Alert**: Notifies when battery drops below threshold
+- **Ignition On/Off**: Notifies when vehicle ignition changes state.
+- **Vehicle Blocking/Unblocking**: Notifies when blocking commands are confirmed.
+- **Low Battery Alert**: Notifies when battery drops below 10V (critical) or 12V (warning).
 
-**Token Resolution**: FCM tokens are fetched from the `customers` collection using the `fcm_token` field. The system:
-1. Looks up the vehicle by IMEI
-2. Gets the associated customer via `customer_id`
-3. Sends notification to customer's `fcm_token`
-4. Falls back to topic-based notification if no token found
+**Token Resolution**: FCM tokens are fetched from the `vehicles` collection using the `token_fcm` field. If no token is found, falls back to topic-based notification.
 
 Configuration:
-- `PUSH_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false)
-- `FIREBASE_CREDENTIALS_JSON`: JSON string with Firebase service account credentials
-- `FIREBASE_DEFAULT_TOPIC`: Fallback topic for notifications (default: vehicle_alerts)
+- `PUSH_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false).
+- `FIREBASE_CREDENTIALS_JSON`: JSON string with Firebase service account credentials, or place a `firebase-credentials.json` file in the gv50 folder.
+- `FIREBASE_DEFAULT_TOPIC`: Fallback topic for notifications when no FCM token is found (default: vehicle_alerts).
 
 ## External Dependencies
 
