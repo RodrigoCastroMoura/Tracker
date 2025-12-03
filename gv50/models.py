@@ -70,7 +70,6 @@ class Customer(BaseDocument):
         })
         return base_dict
 
-
 class Vehicle(BaseDocument):
     """Vehicle information model - estrutura conforme solicitado"""
     # Campo obrigatório
