@@ -37,6 +37,18 @@ The application employs a modular and service-oriented architecture with a clear
   - `VehicleData`: Dataclass for lightweight location/tracking records
 - **Configuration (`config.py`)**: Handles environment-based settings.
 - **Logging (`logger.py`)**: Centralized logging for all services (ERROR level only).
+- **Notification Service (`notification_service.py`)**: Firebase Cloud Messaging integration for push notifications.
+
+### Push Notifications (Firebase)
+The system supports push notifications via Firebase Cloud Messaging (FCM) for key vehicle events:
+- **Ignition On/Off**: Notifies when vehicle ignition changes state.
+- **Vehicle Blocking/Unblocking**: Notifies when blocking commands are confirmed.
+- **Low Battery Alert**: Notifies when battery drops below 10V (critical) or 12V (warning).
+
+Configuration:
+- `FIREBASE_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false).
+- `FIREBASE_CREDENTIALS_JSON`: JSON string with Firebase service account credentials, or place a `firebase-credentials.json` file in the gv50 folder.
+- `FIREBASE_FCM_TOKEN`: Device FCM token to receive notifications.
 
 ## External Dependencies
 
