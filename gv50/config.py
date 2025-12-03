@@ -39,6 +39,11 @@ class Config:
     NEW_DEVICE_IP: str = os.getenv('NEW_DEVICE_IP', PRIMARY_SERVER_IP)
     NEW_DEVICE_PORT: int = int(os.getenv('NEW_DEVICE_PORT', str(PRIMARY_SERVER_PORT)))
     
+    # Firebase Push Notifications Configuration
+    PUSH_NOTIFICATIONS_ENABLED: bool = os.getenv('PUSH_NOTIFICATIONS_ENABLED', 'false').lower() == 'true'
+    FIREBASE_CREDENTIALS_PATH: str = os.getenv('FIREBASE_CREDENTIALS_PATH', 'firebase-credentials.json')
+    FIREBASE_DEFAULT_TOPIC: str = os.getenv('FIREBASE_DEFAULT_TOPIC', 'vehicle_alerts')
+    
     @classmethod
     def is_ip_allowed(cls, ip: str) -> bool:
         """Check if IP address is allowed to connect - apenas lista de IPs permitidos"""
