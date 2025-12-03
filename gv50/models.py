@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Dict, Any
 from dataclasses import dataclass, asdict
-from mongoengine import Document, StringField, BooleanField, DateTimeField, IntField, FloatField
+from mongoengine import Document, StringField, BooleanField, DateTimeField, IntField, FloatField, ReferenceField
 
 @dataclass
 class VehicleData:
@@ -42,6 +42,35 @@ class BaseDocument(Document):
         }
         return result
 
+class Customer(BaseDocument):
+    """Customer model - cliente associado aos veiculos (somente leitura)"""
+    name = StringField(max_length=200)
+    email = StringField(max_length=200)
+    document = StringField(max_length=50)  # CPF/CNPJ
+    phone = StringField(max_length=20)
+    fcm_token = StringField(max_length=500)  # Firebase Cloud Messaging token
+
+    meta = {
+        'collection': 'customers',
+        'indexes': [
+            {'fields': ['email'], 'unique': True, 'name': 'idx_customer_email_unique', 'sparse': True},
+            {'fields': ['document'], 'unique': True, 'name': 'idx_customer_document_unique', 'sparse': True},
+        ]
+    }
+    
+    def to_dict(self):
+        """Convert to dictionary for API responses"""
+        base_dict = super(Customer, self).to_dict()
+        base_dict.update({
+            'name': self.name,
+            'email': self.email,
+            'document': self.document,
+            'phone': self.phone,
+            'fcm_token': self.fcm_token
+        })
+        return base_dict
+
+
 class Vehicle(BaseDocument):
     """Vehicle information model - estrutura conforme solicitado"""
     # Campo obrigatório
@@ -50,6 +79,7 @@ class Vehicle(BaseDocument):
     dsmodelo = StringField(max_length=100)  # Modelo do veículo
     dsmarca = StringField(max_length=100)  # Marca do veículo
     ano = IntField()  # Ano do veículo
+    customer_id = ReferenceField(Customer)  # Cliente associado ao veículo
     comandobloqueo = BooleanField(default=None)  # True = bloquear, False = desbloquear, None = sem comando
     bloqueado = BooleanField(default=False)  # Status atual de bloqueio
     comandotrocarip = BooleanField(default=None)  # True = comando para trocar IP pendente
@@ -79,6 +109,7 @@ class Vehicle(BaseDocument):
             'dsmodelo': self.dsmodelo,
             'ano': self.ano,
             'dsmarca': self.dsmarca,
+            'customer_id': str(self.customer_id.id) if self.customer_id else None,
             'comandobloqueo': self.comandobloqueo,
             'bloqueado': self.bloqueado,
             'comandotrocarip': self.comandotrocarip,

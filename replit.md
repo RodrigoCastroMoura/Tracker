@@ -45,7 +45,7 @@ The system supports push notifications via Firebase Cloud Messaging (FCM) for ke
 - **Vehicle Blocking/Unblocking**: Notifies when blocking commands are confirmed.
 - **Low Battery Alert**: Notifies when battery drops below 10V (critical) or 12V (warning).
 
-**Token Resolution**: FCM tokens are fetched from the `vehicles` collection using the `token_fcm` field. If no token is found, falls back to topic-based notification.
+**Token Resolution**: FCM tokens are fetched from the `customers` collection using the `fcm_token` field. The system looks up the customer associated with the vehicle via `customer_id` reference. If no token is found, falls back to topic-based notification.
 
 Configuration:
 - `PUSH_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false).

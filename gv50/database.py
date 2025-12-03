@@ -1,11 +1,12 @@
 from pymongo import MongoClient, ASCENDING
 from pymongo.errors import ConnectionFailure, OperationFailure
 from mongoengine import connect, disconnect
+from bson import ObjectId
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from config import Config
 from logger import logger
-from models import VehicleData, Vehicle
+from models import VehicleData, Vehicle, Customer
 
 class DatabaseManager:
     """Database manager for MongoDB operations - apenas duas tabelas"""
@@ -118,10 +119,26 @@ class DatabaseManager:
         try:
             vehicle = Vehicle.objects(IMEI=imei).first()
             if vehicle:
-                return vehicle.to_dict()
+                result = vehicle.to_dict()
+                if vehicle.customer_id:
+                    result['customer_id'] = str(vehicle.customer_id.id)
+                return result
             return None
         except Exception as e:
             logger.error(f"Error getting vehicle for IMEI {imei}: {e}")
+            return None
+    
+    def get_customer_by_id(self, customer_id) -> Optional[Dict[str, Any]]:
+        """Get customer information by ID"""
+        try:
+            if isinstance(customer_id, str):
+                customer_id = ObjectId(customer_id)
+            customer = Customer.objects(id=customer_id).first()
+            if customer:
+                return customer.to_dict()
+            return None
+        except Exception as e:
+            logger.error(f"Error getting customer for ID {customer_id}: {e}")
             return None
     
     def get_latest_vehicle_data(self, imei: str, limit: int = 10) -> List[Dict[str, Any]]:
