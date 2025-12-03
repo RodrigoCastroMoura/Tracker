@@ -44,6 +44,7 @@ env/
 
 # Firebase
 docsmart-37bba-firebase-adminsdk-no5c5-a83e08fb7a.json
+firebase-credentials.json
 
 # MongoDB
 *.mongodb
