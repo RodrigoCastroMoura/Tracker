@@ -48,9 +48,11 @@ The system supports push notifications via Firebase Cloud Messaging (FCM) for ke
 **Token Resolution**: FCM tokens are fetched from the `customers` collection using the `fcm_token` field. The system looks up the customer associated with the vehicle via `customer_id` reference. If no token is found, falls back to topic-based notification.
 
 Configuration:
-- `PUSH_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false).
-- `FIREBASE_CREDENTIALS_JSON`: JSON string with Firebase service account credentials, or place a `firebase-credentials.json` file in the gv50 folder.
+- `PUSH_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false). **Currently: ENABLED**
+- `FIREBASE_CREDENTIALS_PATH`: Path to Firebase service account JSON file (default: firebase-credentials.json). **Currently: firebase-credentials.json**
 - `FIREBASE_DEFAULT_TOPIC`: Fallback topic for notifications when no FCM token is found (default: vehicle_alerts).
+
+Firebase Project: **monitoranet-f4195**
 
 ## External Dependencies
 
