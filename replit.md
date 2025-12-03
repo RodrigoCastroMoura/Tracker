@@ -45,10 +45,12 @@ The system supports push notifications via Firebase Cloud Messaging (FCM) for ke
 - **Vehicle Blocking/Unblocking**: Notifies when blocking commands are confirmed.
 - **Low Battery Alert**: Notifies when battery drops below 10V (critical) or 12V (warning).
 
+**Token Resolution**: FCM tokens are fetched from the `vehicles` collection using the `token_fcm` field. If no token is found, falls back to topic-based notification.
+
 Configuration:
-- `FIREBASE_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false).
+- `PUSH_NOTIFICATIONS_ENABLED`: Set to `true` to enable notifications (default: false).
 - `FIREBASE_CREDENTIALS_JSON`: JSON string with Firebase service account credentials, or place a `firebase-credentials.json` file in the gv50 folder.
-- `FIREBASE_FCM_TOKEN`: Device FCM token to receive notifications.
+- `FIREBASE_DEFAULT_TOPIC`: Fallback topic for notifications when no FCM token is found (default: vehicle_alerts).
 
 ## External Dependencies
 

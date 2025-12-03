@@ -12,6 +12,8 @@ except ImportError:
     FIREBASE_AVAILABLE = False
     logger.warning("Firebase Admin SDK not installed. Push notifications disabled.")
 
+from database import db_manager
+
 class NotificationService:
     """Service for sending Firebase Cloud Messaging push notifications"""
     
@@ -65,6 +67,30 @@ class NotificationService:
     def is_enabled(self) -> bool:
         """Check if push notifications are enabled and initialized"""
         return self.enabled and self.initialized and FIREBASE_AVAILABLE
+    
+    def _get_vehicle_fcm_token(self, imei: str) -> Optional[str]:
+        """Get FCM token from vehicle record by IMEI"""
+        try:
+            vehicle = db_manager.get_vehicle_by_imei(imei)
+            if vehicle:
+                return vehicle.get('token_fcm') or vehicle.get('fcm_token')
+            return None
+        except Exception as e:
+            logger.error(f"Error getting FCM token for IMEI {imei}: {e}")
+            return None
+    
+    def _send_notification(self, imei: str, title: str, body: str, data: Dict[str, str]) -> bool:
+        """Send notification to vehicle's FCM token or fallback to topic"""
+        if not self.is_enabled():
+            return False
+        
+        token = self._get_vehicle_fcm_token(imei)
+        
+        if token:
+            return self.send_to_token(token, title, body, data)
+        else:
+            logger.debug(f"No FCM token found for IMEI {imei}, using topic fallback")
+            return self.send_to_topic(self.default_topic, title, body, data)
     
     def send_to_topic(self, topic: str, title: str, body: str, data: Optional[Dict[str, str]] = None) -> bool:
         """Send notification to a Firebase topic"""
@@ -151,8 +177,8 @@ class NotificationService:
             return False
         
         vehicle_id = placa or imei
-        title = "🚗 Veículo Ligado"
-        body = f"O veículo {vehicle_id} foi ligado"
+        title = "Veiculo Ligado"
+        body = f"O veiculo {vehicle_id} foi ligado"
         data = {
             "event_type": "ignition_on",
             "imei": imei,
@@ -160,7 +186,7 @@ class NotificationService:
             "timestamp": datetime.now().isoformat()
         }
         
-        return self.send_to_topic(self.default_topic, title, body, data)
+        return self._send_notification(imei, title, body, data)
     
     def notify_ignition_off(self, imei: str, placa: Optional[str] = None):
         """Send notification when vehicle ignition turns OFF"""
@@ -168,8 +194,8 @@ class NotificationService:
             return False
         
         vehicle_id = placa or imei
-        title = "🛑 Veículo Desligado"
-        body = f"O veículo {vehicle_id} foi desligado"
+        title = "Veiculo Desligado"
+        body = f"O veiculo {vehicle_id} foi desligado"
         data = {
             "event_type": "ignition_off",
             "imei": imei,
@@ -177,7 +203,7 @@ class NotificationService:
             "timestamp": datetime.now().isoformat()
         }
         
-        return self.send_to_topic(self.default_topic, title, body, data)
+        return self._send_notification(imei, title, body, data)
     
     def notify_vehicle_blocked(self, imei: str, placa: Optional[str] = None):
         """Send notification when vehicle is blocked"""
@@ -185,8 +211,8 @@ class NotificationService:
             return False
         
         vehicle_id = placa or imei
-        title = "🔒 Veículo Bloqueado"
-        body = f"O veículo {vehicle_id} foi bloqueado com sucesso"
+        title = "Veiculo Bloqueado"
+        body = f"O veiculo {vehicle_id} foi bloqueado com sucesso"
         data = {
             "event_type": "vehicle_blocked",
             "imei": imei,
@@ -194,7 +220,7 @@ class NotificationService:
             "timestamp": datetime.now().isoformat()
         }
         
-        return self.send_to_topic(self.default_topic, title, body, data)
+        return self._send_notification(imei, title, body, data)
     
     def notify_vehicle_unblocked(self, imei: str, placa: Optional[str] = None):
         """Send notification when vehicle is unblocked"""
@@ -202,8 +228,8 @@ class NotificationService:
             return False
         
         vehicle_id = placa or imei
-        title = "🔓 Veículo Desbloqueado"
-        body = f"O veículo {vehicle_id} foi desbloqueado com sucesso"
+        title = "Veiculo Desbloqueado"
+        body = f"O veiculo {vehicle_id} foi desbloqueado com sucesso"
         data = {
             "event_type": "vehicle_unblocked",
             "imei": imei,
@@ -211,7 +237,7 @@ class NotificationService:
             "timestamp": datetime.now().isoformat()
         }
         
-        return self.send_to_topic(self.default_topic, title, body, data)
+        return self._send_notification(imei, title, body, data)
     
     def notify_low_battery(self, imei: str, voltage: float, placa: Optional[str] = None):
         """Send notification when vehicle battery is low"""
@@ -219,8 +245,8 @@ class NotificationService:
             return False
         
         vehicle_id = placa or imei
-        title = "🔋 Bateria Baixa"
-        body = f"O veículo {vehicle_id} está com bateria baixa ({voltage}V)"
+        title = "Bateria Baixa"
+        body = f"O veiculo {vehicle_id} esta com bateria baixa ({voltage}V)"
         data = {
             "event_type": "low_battery",
             "imei": imei,
@@ -229,7 +255,7 @@ class NotificationService:
             "timestamp": datetime.now().isoformat()
         }
         
-        return self.send_to_topic(self.default_topic, title, body, data)
+        return self._send_notification(imei, title, body, data)
 
 
 notification_service = NotificationService()
