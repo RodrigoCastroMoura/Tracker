@@ -87,6 +87,7 @@ class Vehicle(BaseDocument):
     bateriavoltagem = FloatField()  # Voltagem atual da bateria
     bateriabaixa = BooleanField(default=False)  # True se bateria estiver baixa
     ultimoalertabateria = DateTimeField()  # Timestamp do último alerta
+    tsusermanu = DateTimeField()  # Timestamp de atualização do usuário/sistema
     status = StringField(choices=['active', 'inactive'], default='active')
     visible = BooleanField(default=True)  # Campo para exclusão lógica
 
@@ -117,6 +118,7 @@ class Vehicle(BaseDocument):
             'bateriavoltagem': self.bateriavoltagem,
             'bateriabaixa': self.bateriabaixa,
             'ultimoalertabateria': self.ultimoalertabateria.isoformat() if hasattr(self, 'ultimoalertabateria') and self.ultimoalertabateria else None,
+            'tsusermanu': self.tsusermanu.isoformat() if hasattr(self, 'tsusermanu') and self.tsusermanu else None,
             'status': self.status,
             'visible': self.visible
         })
