@@ -29,29 +29,44 @@ class NotificationService:
     def _load_config(self):
         """Load notification configuration from Config class"""
         self.enabled = Config.PUSH_NOTIFICATIONS_ENABLED
-        self.credentials_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+        base_path = Config.FIREBASE_CREDENTIALS_PATH
+        if not os.path.isabs(base_path):
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(script_dir)
+            self.credentials_path = os.path.join(parent_dir, base_path)
+            if not os.path.exists(self.credentials_path):
+                self.credentials_path = os.path.join(script_dir, base_path)
+        else:
+            self.credentials_path = base_path
         self.default_topic = Config.FIREBASE_DEFAULT_TOPIC
         
         if not self.enabled:
             logger.info("Push notifications are DISABLED (PUSH_NOTIFICATIONS_ENABLED=false)")
     
     def _initialize_firebase(self):
-        """Initialize Firebase Admin SDK from environment variable"""
+        """Initialize Firebase Admin SDK"""
         try:
             if firebase_admin._apps:
                 self.initialized = True
                 logger.info("Firebase already initialized")
                 return
             
-            if self.credentials_json:
-                cred_dict = json.loads(self.credentials_json)
-                cred = credentials.Certificate(cred_dict)
+            if os.path.exists(self.credentials_path):
+                cred = credentials.Certificate(self.credentials_path)
                 firebase_admin.initialize_app(cred)
                 self.initialized = True
-                logger.info("Firebase initialized successfully from environment variable")
+                logger.info("Firebase initialized successfully from credentials file")
             else:
-                logger.warning("Firebase credentials not found in FIREBASE_CREDENTIALS_JSON")
-                self.enabled = False
+                firebase_creds_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+                if firebase_creds_json:
+                    cred_dict = json.loads(firebase_creds_json)
+                    cred = credentials.Certificate(cred_dict)
+                    firebase_admin.initialize_app(cred)
+                    self.initialized = True
+                    logger.info("Firebase initialized successfully from environment variable")
+                else:
+                    logger.warning(f"Firebase credentials not found at {self.credentials_path} or in FIREBASE_CREDENTIALS_JSON")
+                    self.enabled = False
                     
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {e}")
