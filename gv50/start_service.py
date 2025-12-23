@@ -1,40 +1,43 @@
 #!/usr/bin/env python3
 """
-GV50 Service Starter - Force correct configuration
+GV50 Service Starter - Asyncio Version
 """
 import os
 import sys
+import asyncio
 
-# Force correct configuration before importing other modules
-os.environ['SERVER_PORT'] = '8000'  # GV50 devices connect on port 8000
-os.environ['DATABASE_NAME'] = 'tracker'  # Use correct database
+os.environ['SERVER_PORT'] = '8000'
+os.environ['DATABASE_NAME'] = 'tracker'
 
-# Now import and start the service
 from main import GV50TrackerService
 
-def main():
-    """Start GV50 service with correct configuration"""
-    print("=== STARTING GV50 SERVICE ON PORT 8000 ===")
+
+async def run_service():
+    """Run GV50 service with asyncio"""
+    print("=== STARTING GV50 SERVICE ON PORT 8000 (Asyncio) ===")
     
     service = GV50TrackerService()
     
     try:
-        if service.start():
-            print("✅ GV50 Service started successfully on port 8000")
-            # Keep service running
-            while service.running:
-                import time
-                time.sleep(1)
-        else:
-            print("❌ Failed to start GV50 service")
-            sys.exit(1)
+        await service.start()
+        print("GV50 Service started successfully on port 8000")
+        
     except KeyboardInterrupt:
-        print("\n🛑 Service interrupted by user")
-        service.stop()
+        print("\nService interrupted by user")
     except Exception as e:
-        print(f"❌ Service error: {e}")
+        print(f"Service error: {e}")
+    finally:
         service.stop()
-        sys.exit(1)
+
+
+def main():
+    """Main entry point"""
+    try:
+        asyncio.run(run_service())
+    except KeyboardInterrupt:
+        print("\nShutdown requested...")
+        sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

@@ -6,38 +6,48 @@ This project is a Python-based GPS tracking service designed to communicate with
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+- **2025-12-23**: Converted from threading to asyncio for better performance and scalability
+  - tcp_server.py: Replaced threading.Thread with asyncio.start_server()
+  - database.py: Added connection pooling and async wrapper methods
+  - message_handler.py: Added async versions of all database methods
+  - main.py: Converted to use asyncio event loop
+  - start_service.py: Updated to use asyncio.run()
+  - Added test_connection.py for basic asyncio server testing
+
 ## System Architecture
 The application employs a modular and service-oriented architecture with a clear separation of concerns.
 
 ### Backend Architecture
 - **Service-Based Organization**: Each device type (e.g., GV50) has its own dedicated, self-contained service folder.
-- **TCP Server**: A custom socket-based server manages persistent connections with GPS devices, handling up to 100 concurrent connections. It includes IP whitelisting/blacklisting for security.
+- **Asyncio TCP Server**: An asyncio-based server manages persistent connections with GPS devices, handling concurrent connections efficiently without thread overhead. Supports MAX_CONNECTIONS limit from environment.
 - **Protocol Parser**: Device-specific parsers (e.g., for Queclink @Track) translate raw protocol messages into structured data, generating acknowledgments.
-- **Message Handler**: This layer processes parsed messages, applies business logic, updates the database, tracks IP changes, and manages vehicle state.
-- **Database Layer**: MongoDB is used as the primary storage, with a unified 'tracker' database supporting various device types. Uses MongoEngine ODM for the Vehicle model and PyMongo for VehicleData.
+- **Message Handler**: This layer processes parsed messages, applies business logic, updates the database, tracks IP changes, and manages vehicle state. Supports both sync and async methods.
+- **Database Layer**: MongoDB with connection pooling (maxPoolSize=200, minPoolSize=50). Uses MongoEngine ODM for the Vehicle model and PyMongo for VehicleData. Includes async wrapper methods using asyncio.to_thread().
 - **Configuration Management**: Environment variables handle all settings for flexible deployment.
 - **Logging System**: A comprehensive system provides configurable logging levels and outputs (optimized to ERROR level only for performance).
 
 ### Key Design Decisions
-- **Concurrency Model**: Each GPS device connection is handled in its own thread to support concurrent devices.
+- **Concurrency Model**: Asyncio-based single-threaded event loop for efficient I/O handling without thread overhead. Database operations use asyncio.to_thread() for non-blocking execution.
 - **Data Storage**: MongoDB was chosen for its flexible schema and high write performance, storing tracking records (`vehicle_data`) and device information (`vehicles`).
 - **ORM/ODM Pattern**: MongoEngine used for Vehicle model with BaseDocument pattern providing audit fields (created_at, updated_at). VehicleData uses dataclass for lightweight tracking records.
-- **Configuration**: All settings are managed via environment variables.
+- **Configuration**: All settings are managed via environment variables including MAX_CONNECTIONS and CONNECTION_TIMEOUT.
 - **Protocol Abstraction**: The design allows for easy integration of new device protocols.
 - **Command System**: Implements immediate command execution (e.g., blocking/unblocking, IP changes) via TCP, supporting bidirectional communication and real-time status updates.
 - **Timestamp Handling**: Proper conversion of device timestamps to datetime objects.
-- **Performance Optimization**: Logging optimized to ERROR level only for improved I/O performance.
+- **Performance Optimization**: Logging optimized to ERROR level only for improved I/O performance. Asyncio reduces memory usage vs threading.
 
 ### Key Components
-- **GV50 Service**: Contains components like `tcp_server.py`, `protocol_parser.py`, and `message_handler.py`.
-- **Database Manager (`database.py`)**: Manages both PyMongo and MongoEngine connections, data models, and indexing.
+- **GV50 Service**: Contains components like `tcp_server.py` (asyncio), `protocol_parser.py`, and `message_handler.py`.
+- **Database Manager (`database.py`)**: Manages both PyMongo and MongoEngine connections with connection pooling, data models, and indexing. Provides async wrapper methods.
 - **Data Models (`models.py`)**: 
   - `BaseDocument`: Abstract MongoEngine Document with audit fields (created_at, updated_at)
   - `Vehicle`: MongoEngine Document extending BaseDocument for device/vehicle management with fields like IMEI, dsplaca, bloqueado, ignicao, etc.
   - `VehicleData`: Dataclass for lightweight location/tracking records
-- **Configuration (`config.py`)**: Handles environment-based settings.
+- **Configuration (`config.py`)**: Handles environment-based settings including MAX_CONNECTIONS, CONNECTION_TIMEOUT.
 - **Logging (`logger.py`)**: Centralized logging for all services (ERROR level only).
 - **Notification Service (`notification_service.py`)**: Firebase Cloud Messaging integration for push notifications.
+- **Test Script (`test_connection.py`)**: Basic asyncio connection tests for the server.
 
 ### Push Notifications (Firebase)
 The system supports push notifications via Firebase Cloud Messaging (FCM) for key vehicle events:
@@ -55,19 +65,19 @@ Configuration:
 ## External Dependencies
 
 ### Database
-- **MongoDB**: Primary data store.
-  - Drivers: PyMongo + MongoEngine ODM
+- **MongoDB**: Primary data store with connection pooling.
+  - Drivers: PyMongo (with pooling: maxPoolSize=200, minPoolSize=50) + MongoEngine ODM
   - Database Name: `tracker`
   - Collections: `vehicle_data`, `vehicles`
   - Connection String: `mongodb+srv://docsmartuser:hk9D7DSnyFlcPmKL@cluster0.qats6.mongodb.net/tracker`
   - Vehicle model uses MongoEngine with unique indexes on IMEI and dsplaca (sparse)
 
 ### Python Packages
-- `pymongo`: For direct MongoDB interaction (VehicleData records).
+- `pymongo`: For direct MongoDB interaction (VehicleData records) with connection pooling.
 - `mongoengine`: ODM for Vehicle model with BaseDocument pattern.
 - `python-dotenv`: For environment variable management.
-- `socket`: For TCP network communication.
-- `threading`: For concurrent connection handling.
+- `asyncio`: For async TCP server and concurrent connection handling (built-in).
+- `aiofiles`: For async file operations.
 - `re`: For regular expressions in protocol parsing.
 
 ### Protocol Support

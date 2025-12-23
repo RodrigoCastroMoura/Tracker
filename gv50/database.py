@@ -1,3 +1,4 @@
+import asyncio
 from pymongo import MongoClient, ASCENDING
 from pymongo.errors import ConnectionFailure, OperationFailure
 from mongoengine import connect, disconnect
@@ -8,8 +9,9 @@ from config import Config
 from logger import logger
 from models import VehicleData, Vehicle, Customer
 
+
 class DatabaseManager:
-    """Database manager for MongoDB operations - apenas duas tabelas"""
+    """Database manager for MongoDB operations with connection pooling"""
     
     def __init__(self):
         self.client: Optional[MongoClient] = None
@@ -18,35 +20,37 @@ class DatabaseManager:
         self.setup_collections()
     
     def connect(self):
-        """Connect to MongoDB"""
+        """Connect to MongoDB with connection pooling"""
         try:
-            # Connect PyMongo for VehicleData operations
-            self.client = MongoClient(Config.MONGODB_URI)
+            self.client = MongoClient(
+                Config.MONGODB_URI,
+                maxPoolSize=200,
+                minPoolSize=50,
+                maxIdleTimeMS=30000,
+                serverSelectionTimeoutMS=5000
+            )
             self.db = self.client[Config.DATABASE_NAME]
-            # Test connection
             self.client.admin.command('ping')
             
-            # Connect MongoEngine for Vehicle model
             connect(host=Config.MONGODB_URI, db=Config.DATABASE_NAME)
             
-            logger.info(f"Connected to MongoDB database: {Config.DATABASE_NAME}")
+            logger.info(f"Connected to MongoDB database: {Config.DATABASE_NAME} (with connection pooling)")
         except ConnectionFailure as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
             raise
     
     def setup_collections(self):
-        """Setup MongoDB collections and indexes - apenas duas tabelas"""
+        """Setup MongoDB collections and indexes"""
         try:
-            # Create indexes for better performance - apenas para as duas tabelas solicitadas
             collections_indexes = {
                 'vehicle_data': [
                     ('imei', ASCENDING),
-                    ('timestamp', ASCENDING)  # Removido ignition, agora só na vehicles
+                    ('timestamp', ASCENDING)
                 ],
                 'vehicles': [
-                    ('IMEI', ASCENDING),  # Novo campo IMEI maiúsculo
-                    ('tsusermanu', ASCENDING),  # Novo campo timestamp
-                    ('dsplaca', ASCENDING)  # Novo campo placa
+                    ('IMEI', ASCENDING),
+                    ('tsusermanu', ASCENDING),
+                    ('dsplaca', ASCENDING)
                 ]
             }
             
@@ -60,7 +64,7 @@ class DatabaseManager:
             logger.error(f"Error setting up collections: {e}")
     
     def insert_vehicle_data(self, vehicle_data: VehicleData) -> bool:
-        """Insert vehicle tracking data"""
+        """Insert vehicle tracking data (sync version)"""
         try:
             if self.db is None:
                 return False
@@ -72,50 +76,52 @@ class DatabaseManager:
             logger.error(f"Error inserting vehicle data for IMEI {vehicle_data.imei}: {e}")
             return False
     
+    async def insert_vehicle_data_async(self, vehicle_data: VehicleData) -> bool:
+        """Insert vehicle tracking data (async wrapper)"""
+        return await asyncio.to_thread(self.insert_vehicle_data, vehicle_data)
+    
     def upsert_vehicle(self, vehicle_data: Dict[str, Any]) -> bool:
-        """Update or insert vehicle information using MongoEngine"""
+        """Update or insert vehicle information using MongoEngine (sync version)"""
         try:
             imei = vehicle_data.get('IMEI')
             if not imei:
                 logger.error("Cannot upsert vehicle without IMEI")
                 return False
             
-            # Filter out incompatible fields from old database schema
             filtered_data = {k: v for k, v in vehicle_data.items() 
                            if k not in ['created_by', 'updated_by', '_id']}
             
-            # Convert date strings to datetime objects for DateTimeFields
             date_fields = ['created_at', 'updated_at', 'ultimoalertabateria', 'tsusermanu']
             for field in date_fields:
                 if field in filtered_data and isinstance(filtered_data[field], str):
                     try:
                         from dateutil import parser as date_parser
                         filtered_data[field] = date_parser.parse(filtered_data[field])
-                    except:
-                        # If parsing fails, remove the field
+                    except Exception:
                         filtered_data.pop(field, None)
             
-            # Try to get existing vehicle
             existing_vehicle = Vehicle.objects(IMEI=imei).first()
             
             if existing_vehicle:
-                # Update existing vehicle
                 for key, value in filtered_data.items():
                     if hasattr(existing_vehicle, key):
                         setattr(existing_vehicle, key, value)
                 existing_vehicle.save()
             else:
-                # Create new vehicle
                 new_vehicle = Vehicle(**filtered_data)
                 new_vehicle.save()
             
             return True
         except Exception as e:
-            logger.error(f"Error upserting vehicle for IMEI {imei}: {e}")
+            logger.error(f"Error upserting vehicle for IMEI {vehicle_data.get('IMEI')}: {e}")
             return False
     
+    async def upsert_vehicle_async(self, vehicle_data: Dict[str, Any]) -> bool:
+        """Update or insert vehicle information (async wrapper)"""
+        return await asyncio.to_thread(self.upsert_vehicle, vehicle_data)
+    
     def get_vehicle_by_imei(self, imei: str) -> Optional[Dict[str, Any]]:
-        """Get vehicle information by IMEI using MongoEngine"""
+        """Get vehicle information by IMEI using MongoEngine (sync version)"""
         try:
             vehicle = Vehicle.objects(IMEI=imei).first()
             if vehicle:
@@ -127,6 +133,10 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error getting vehicle for IMEI {imei}: {e}")
             return None
+    
+    async def get_vehicle_by_imei_async(self, imei: str) -> Optional[Dict[str, Any]]:
+        """Get vehicle information by IMEI (async wrapper)"""
+        return await asyncio.to_thread(self.get_vehicle_by_imei, imei)
     
     def get_customer_by_id(self, customer_id) -> Optional[Dict[str, Any]]:
         """Get customer information by ID"""
@@ -171,7 +181,7 @@ class DatabaseManager:
         """Close database connection"""
         if self.client:
             self.client.close()
-            disconnect()  # Disconnect MongoEngine
+            disconnect()
             logger.info("Database connection closed")
     
     def close_connection(self):
@@ -179,15 +189,14 @@ class DatabaseManager:
         self.close()
         
     def get_pending_commands(self, imei: str) -> List[Dict[str, Any]]:
-        """Get pending commands for a vehicle - simplified version"""
+        """Get pending commands for a vehicle"""
         try:
             if self.db is None:
                 return []
-            # Para simplicidade, retornamos lista vazia - comandos podem ser implementados futuramente
             return []
         except Exception as e:
             logger.error(f"Error getting pending commands for IMEI {imei}: {e}")
             return []
 
-# Global database manager instance
+
 db_manager = DatabaseManager()

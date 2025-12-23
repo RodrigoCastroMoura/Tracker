@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
 """
-GPS Tracker Service
-A Python service for processing GPS tracker data from multiple device types
+GV50 GPS Tracker Service - Asyncio Version
+A Python service for processing GPS tracker data from GV50 devices
 """
 
 import sys
 import signal
-import time
-import threading
-from datetime import datetime, timezone
+import asyncio
+from datetime import datetime
 
-# Import GV50 service
 from config import Config as GV50Config
 from logger import logger as gv50_logger
 from tcp_server import tcp_server as gv50_tcp_server
 from database import db_manager as gv50_db_manager
 
+
 class GV50TrackerService:
-    """Main service class for GV50 GPS tracker processing"""
+    """Main service class for GV50 GPS tracker processing - Asyncio version"""
     
     def __init__(self):
         self.running = False
-        self.service_threads = []
         self.active_services = []
         self.stats = {
             'start_time': None,
@@ -29,63 +27,39 @@ class GV50TrackerService:
             'total_messages': 0,
             'last_activity': None
         }
+        self._monitor_task = None
     
-    def start(self):
-        """Start GV50 GPS tracker service"""
+    async def start(self):
+        """Start GV50 GPS tracker service - async version"""
         try:
             print("=" * 60)
-            print("GV50 Tracker Service Starting")
+            print("GV50 Tracker Service Starting (Asyncio)")
             print("=" * 60)
             
             self.running = True
             self.stats['start_time'] = datetime.now()
             
-            # Start GV50 service
-            if self._start_gv50_service():
-                self.active_services.append('GV50')
-                print("✓ GV50 service started successfully")
-            
-            print("GV50 Tracker Service ready")
-            
-            return len(self.active_services) > 0
-            
-        except Exception as e:
-            print(f"Error starting GV50 service: {e}")
-            return False
-    
-    def _start_gv50_service(self):
-        """Start GV50 tracking service"""
-        try:
-            # Validate GV50 configuration
             if not self._validate_gv50_configuration():
                 return False
             
-            # Test GV50 database connection
             if not self._test_gv50_database():
                 return False
             
-            # Start GV50 TCP server in separate thread
-            gv50_thread = threading.Thread(
-                target=gv50_tcp_server.start_server,
-                daemon=True,
-                name="GV50-TCP-Server"
-            )
-            gv50_thread.start()
-            self.service_threads.append(gv50_thread)
+            self.active_services.append('GV50')
+            print("GV50 service configured successfully")
             
-            # Start GV50 monitoring thread
-            gv50_monitor_thread = threading.Thread(
-                target=self._gv50_monitoring_loop,
-                daemon=True,
-                name="GV50-Monitor"
-            )
-            gv50_monitor_thread.start()
-            self.service_threads.append(gv50_monitor_thread)
+            self._monitor_task = asyncio.create_task(self._monitoring_loop())
+            
+            print("GV50 Tracker Service ready")
+            print(f"Listening on {GV50Config.SERVER_IP}:{GV50Config.SERVER_PORT}")
+            
+            await gv50_tcp_server.start_server()
             
             return True
             
         except Exception as e:
             print(f"Error starting GV50 service: {e}")
+            gv50_logger.error(f"Error starting GV50 service: {e}")
             return False
     
     def _validate_gv50_configuration(self):
@@ -110,40 +84,37 @@ class GV50TrackerService:
             print(f"GV50 Database connection test error: {e}")
             return False
     
-    def _gv50_monitoring_loop(self):
+    async def _monitoring_loop(self):
         """Monitoring loop for GV50 service health"""
         while self.running:
             try:
-                time.sleep(30)  # Monitor every 30 seconds
+                await asyncio.sleep(30)
                 
                 if not self.running:
                     break
                 
-                # Log GV50 service status
                 connection_count = gv50_tcp_server.get_connection_count()
                 uptime = self._get_uptime()
                 
                 gv50_logger.debug(f"GV50 Status - Uptime: {uptime}, Active Connections: {connection_count}")
                 
-                # Update statistics
                 if connection_count > 0:
                     self.stats['last_activity'] = datetime.now()
                 
-                # Health check
-                if not self._gv50_health_check():
+                if not self._health_check():
                     gv50_logger.warning("GV50 service health check failed")
             
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 gv50_logger.error(f"Error in GV50 monitoring loop: {e}")
-                time.sleep(10)
+                await asyncio.sleep(10)
     
-    def _gv50_health_check(self) -> bool:
+    def _health_check(self) -> bool:
         """Perform GV50 service health check"""
         try:
-            # Check database connection
             gv50_db_manager.client.admin.command('ping')
             
-            # Check if server is running
             if not gv50_tcp_server.running:
                 return False
             
@@ -159,18 +130,14 @@ class GV50TrackerService:
         
         self.running = False
         
-        # Stop GV50 service
+        if self._monitor_task:
+            self._monitor_task.cancel()
+        
         if 'GV50' in self.active_services:
             gv50_tcp_server.stop_server()
             gv50_db_manager.close_connection()
-            print("✓ GV50 service stopped")
+            print("GV50 service stopped")
         
-        # Wait for service threads to finish
-        for thread in self.service_threads:
-            if thread.is_alive():
-                thread.join(timeout=10)
-        
-        # Log service statistics
         self._log_final_statistics()
         
         print("GV50 Tracker Service stopped")
@@ -180,8 +147,7 @@ class GV50TrackerService:
         try:
             if not self.stats['start_time']:
                 return "Unknown"
-            date = datetime.now()
-            uptime = date - self.stats['start_time']
+            uptime = datetime.now() - self.stats['start_time']
             hours, remainder = divmod(int(uptime.total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
             
@@ -200,6 +166,7 @@ class GV50TrackerService:
         except Exception as e:
             print(f"Error logging statistics: {e}")
 
+
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
     print(f"\nReceived signal {signum}, shutting down...")
@@ -207,32 +174,26 @@ def signal_handler(signum, frame):
         signal_handler.service.stop()
     sys.exit(0)
 
-def main():
-    """Main entry point"""
-    # Setup signal handlers
+
+async def main():
+    """Main entry point - async"""
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Create and start service
     service = GV50TrackerService()
-    signal_handler.service = service  # Store reference for signal handler
+    signal_handler.service = service
     
     try:
-        if service.start():
-            # Keep the main thread alive
-            while service.running:
-                time.sleep(1)
-        else:
-            print("Failed to start GV50 Tracker Service")
-            sys.exit(1)
-            
+        await service.start()
+        
     except KeyboardInterrupt:
         print("\nShutdown requested...")
     except Exception as e:
         print(f"Unexpected error: {e}")
-        sys.exit(1)
+        gv50_logger.error(f"Unexpected error: {e}")
     finally:
         service.stop()
 
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
