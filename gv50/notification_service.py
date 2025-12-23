@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from logger import logger
+from config import Config
 
 try:
     import firebase_admin
@@ -26,10 +27,18 @@ class NotificationService:
             self._initialize_firebase()
     
     def _load_config(self):
-        """Load notification configuration from environment variables"""
-        self.enabled = os.getenv('PUSH_NOTIFICATIONS_ENABLED', 'false').lower() == 'true'
-        self.credentials_path = os.getenv('FIREBASE_CREDENTIALS_PATH', 'firebase-credentials.json')
-        self.default_topic = os.getenv('FIREBASE_DEFAULT_TOPIC', 'vehicle_alerts')
+        """Load notification configuration from Config class"""
+        self.enabled = Config.PUSH_NOTIFICATIONS_ENABLED
+        base_path = Config.FIREBASE_CREDENTIALS_PATH
+        if not os.path.isabs(base_path):
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(script_dir)
+            self.credentials_path = os.path.join(parent_dir, base_path)
+            if not os.path.exists(self.credentials_path):
+                self.credentials_path = os.path.join(script_dir, base_path)
+        else:
+            self.credentials_path = base_path
+        self.default_topic = Config.FIREBASE_DEFAULT_TOPIC
         
         if not self.enabled:
             logger.info("Push notifications are DISABLED (PUSH_NOTIFICATIONS_ENABLED=false)")
