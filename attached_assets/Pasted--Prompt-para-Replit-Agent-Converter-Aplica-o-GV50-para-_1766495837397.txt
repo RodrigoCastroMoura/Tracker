@@ -1,0 +1,441 @@
+# 🚀 Prompt para Replit Agent: Converter Aplicação GV50 para Asyncio
+
+## 📋 CONTEXTO
+
+Tenho uma aplicação Python de rastreamento GPS para dispositivos Queclink GV50 que atualmente usa threads para gerenciar conexões TCP. Preciso converter para asyncio para melhor performance e escalabilidade, mantendo todas as funcionalidades existentes.
+
+## 🎯 OBJETIVOS
+
+1. **Converter de threads para asyncio** para reduzir consumo de recursos
+2. **Manter compatibilidade** com protocolo @Track do GV50
+3. **Preservar todas funcionalidades** existentes (comandos, bloqueio, troca de IP)
+4. **Manter configurabilidade** via arquivo .env
+
+## 📁 ESTRUTURA ATUAL
+```
+/
+├── config.py          # Configurações e variáveis de ambiente
+├── database.py        # Gerenciador MongoDB (PyMongo + MongoEngine)
+├── logger.py          # Sistema de logging
+├── main.py            # Entry point do serviço
+├── message_handler.py # Processa mensagens e atualiza database
+├── models.py          # Models MongoDB (Vehicle, VehicleData)
+├── protocol_parser.py # Parser do protocolo @Track
+├── tcp_server.py      # Servidor TCP (PRECISA SER CONVERTIDO)
+└── datetime_converter.py # Conversão de timestamps
+```
+
+## 🔧 TAREFAS ESPECÍFICAS
+
+### 1. Converter `tcp_server.py` para Asyncio
+
+**Arquivo atual:** Usa `threading.Thread` para cada conexão
+
+**Requisitos da conversão:**
+- Substituir `socket` por `asyncio.start_server()`
+- Converter `begin_receive()` para async/await
+- Manter método `read_callback()` mas tornar assíncrono
+- Preservar lógica de processamento de mensagens
+- Manter compatibilidade com `message_handler`
+- Respeitar `Config.MAX_CONNECTIONS` do .env
+
+**Exemplo de estrutura desejada:**
+```python
+import asyncio
+
+class AsyncGV50Server:
+    def __init__(self):
+        self.running = False
+        self.connected_devices = {}
+        self.commands_sent = {}
+        # Ler limite de conexões do .env
+        self.max_connections = Config.MAX_CONNECTIONS
+    
+    async def handle_client(self, reader, writer):
+        """Handle each client connection asynchronously"""
+        addr = writer.get_extra_info('peername')
+        client_ip = addr[0]
+        
+        # Verificar IP permitido
+        if not Config.is_ip_allowed(client_ip):
+            writer.close()
+            await writer.wait_closed()
+            return
+        
+        # ... implementar lógica de recebimento
+        try:
+            while self.running:
+                data = await reader.read(999999)
+                if not data:
+                    break
+                
+                # Processar mensagem
+                response = await self.process_message(data, client_ip)
+                if response:
+                    writer.write(response.encode())
+                    await writer.drain()
+        except Exception as e:
+            logger.error(f"Error handling client {client_ip}: {e}")
+        finally:
+            writer.close()
+            await writer.wait_closed()
+    
+    async def start_server(self):
+        """Start asyncio TCP server"""
+        server = await asyncio.start_server(
+            self.handle_client,
+            Config.SERVER_IP,
+            Config.SERVER_PORT,
+            backlog=Config.MAX_CONNECTIONS
+        )
+        
+        self.running = True
+        logger.info(f"Asyncio server started on {Config.SERVER_IP}:{Config.SERVER_PORT}")
+        
+        async with server:
+            await server.serve_forever()
+```
+
+### 2. Otimizar `database.py`
+
+**Adicionar connection pooling:**
+```python
+self.client = MongoClient(
+    Config.MONGODB_URI,
+    maxPoolSize=200,
+    minPoolSize=50,
+    maxIdleTimeMS=30000,
+    serverSelectionTimeoutMS=5000
+)
+```
+
+**Para operações database (escolha uma opção):**
+
+**OPÇÃO A (Mais Simples):** Manter PyMongo sync + usar `asyncio.to_thread()`
+```python
+async def insert_vehicle_data_async(self, vehicle_data):
+    """Insert vehicle data asynchronously"""
+    return await asyncio.to_thread(
+        self.insert_vehicle_data,
+        vehicle_data
+    )
+```
+
+**OPÇÃO B (Mais Performática):** Converter para Motor (async MongoDB driver)
+```python
+from motor.motor_asyncio import AsyncIOMotorClient
+
+async def insert_vehicle_data(self, vehicle_data):
+    """Insert vehicle data"""
+    collection = self.db['vehicle_data']
+    result = await collection.insert_one(vehicle_data.to_dict())
+    return result.inserted_id is not None
+```
+
+**Escolha OPÇÃO A** se quiser mudanças mínimas, **OPÇÃO B** para melhor performance.
+
+### 3. Adaptar `message_handler.py`
+
+**Tornar métodos assíncronos:**
+```python
+class MessageHandler:
+    
+    async def handle_incoming_message(self, raw_message: str, client_ip: str):
+        """Handle incoming message - async version"""
+        try:
+            parsed_data = protocol_parser.parse_message(raw_message)
+            
+            if not parsed_data or not parsed_data.get('imei'):
+                return None
+            
+            imei = parsed_data['imei']
+            
+            # Atualizar vehicles
+            await self._update_vehicle_info(parsed_data, client_ip, raw_message)
+            
+            # Salvar histórico
+            await self._save_vehicle_data(parsed_data, client_ip, raw_message)
+            
+            # Gerar ACK
+            response = protocol_parser.generate_acknowledgment(parsed_data)
+            
+            # Executar comandos
+            await self._execute_command_logic(imei, client_ip)
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+            return None
+    
+    async def _update_vehicle_info(self, parsed_data, client_ip, raw_message):
+        """Update vehicle info - async"""
+        # Se usar OPÇÃO A (PyMongo + to_thread):
+        await asyncio.to_thread(
+            db_manager.upsert_vehicle,
+            vehicle_data
+        )
+        
+        # Se usar OPÇÃO B (Motor):
+        # await db_manager.upsert_vehicle(vehicle_data)
+```
+
+**Converter TODOS os métodos que chamam database para async:**
+- `_update_vehicle_info()` → async
+- `_save_vehicle_data()` → async
+- `_execute_command_logic()` → async
+- `save_vehicle_data()` → async
+- `update_vehicle_ignition()` → async
+- `update_vehicle_blocking()` → async
+- `set_blocking_command()` → async
+
+### 4. Ajustar `main.py`
+
+**Converter para asyncio:**
+```python
+import asyncio
+
+class GV50TrackerService:
+    
+    def __init__(self):
+        self.running = False
+        self.stats = {
+            'start_time': None,
+            'total_connections': 0,
+            'total_messages': 0
+        }
+    
+    async def start(self):
+        """Start service - async version"""
+        try:
+            print("=" * 60)
+            print("GV50 Tracker Service Starting (Asyncio)")
+            print("=" * 60)
+            
+            self.running = True
+            self.stats['start_time'] = datetime.utcnow()
+            
+            # Testar database
+            if not self._test_gv50_database():
+                return False
+            
+            # Iniciar servidor asyncio
+            await gv50_tcp_server.start_server()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error starting service: {e}")
+            return False
+    
+    def stop(self):
+        """Stop service"""
+        print("Stopping GV50 Tracker Service...")
+        self.running = False
+        gv50_tcp_server.running = False
+
+async def main():
+    """Main entry point - async"""
+    service = GV50TrackerService()
+    
+    try:
+        await service.start()
+        
+        # Keep running
+        while service.running:
+            await asyncio.sleep(1)
+            
+    except KeyboardInterrupt:
+        print("\nShutdown requested...")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+    finally:
+        service.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### 5. Atualizar `config.py`
+
+**Garantir que MAX_CONNECTIONS está configurável:**
+```python
+class Config:
+    # ... existente ...
+    
+    # Connection limits (configurável via .env)
+    MAX_CONNECTIONS: int = int(os.getenv('MAX_CONNECTIONS', '1000'))
+    CONNECTION_TIMEOUT: int = int(os.getenv('CONNECTION_TIMEOUT', '3600'))
+```
+
+**Exemplo de .env:**
+```env
+# Server Configuration
+SERVER_ENABLED=true
+SERVER_IP=0.0.0.0
+SERVER_PORT=8000
+MAX_CONNECTIONS=1000
+CONNECTION_TIMEOUT=3600
+```
+
+### 6. Criar Arquivo de Dependências
+
+**Atualizar `requirements.txt` ou `deps.txt`:**
+```txt
+# Existing
+pymongo==4.13.2
+python-dotenv==1.1.1
+mongoengine==0.28.2
+
+# Add if using Motor (OPÇÃO B)
+motor==3.3.2
+
+# Add for better async support
+aiofiles==23.2.1
+```
+
+## ⚠️ IMPORTANTE: PRESERVAR
+
+### Não alterar:
+1. **Estrutura do MongoDB** (collections `vehicles` e `vehicle_data`)
+2. **Campos dos models** (Vehicle e VehicleData)
+3. **Lógica de parsing** de protocolos @Track
+4. **Sistema de comandos** (bloqueio, IP change)
+5. **Formato das mensagens** ACK/RESP
+6. **Configurações do .env** (manter retrocompatibilidade)
+
+### Manter funcionalidades:
+- ✅ TCP Long-Connection permanente
+- ✅ Heartbeat (GTHBD) a cada 3 minutos
+- ✅ Processamento de GTFRI, GTIGN, GTIGF, GTOUT, GTSTT
+- ✅ Comandos bidirecionais (AT+GTOUT, AT+GTSRI)
+- ✅ Cache de comandos enviados (`commands_sent`)
+- ✅ Rastreamento de dispositivos conectados (`connected_devices`)
+- ✅ Verificação de IP permitidos (`Config.is_ip_allowed()`)
+- ✅ Limite de conexões configurável via .env
+- ✅ Logging de erros
+
+## 🧪 TESTE BÁSICO
+
+**Criar script simples de teste:**
+```python
+# test_connection.py
+import asyncio
+
+async def test_device():
+    """Test single device connection"""
+    reader, writer = await asyncio.open_connection('localhost', 8000)
+    
+    # Send GTFRI
+    message = "+RESP:GTFRI,090302,865083030049613,,10,1,1,0.0,236,724.7,-46.778817,-23.503123,20250727152556,0724,0003,08A3,59CF,00,0.0,,,,,110000,10,0,7,20250727122605,054F$"
+    writer.write(message.encode())
+    await writer.drain()
+    
+    # Wait for ACK
+    data = await reader.read(1024)
+    print(f"Received: {data.decode()}")
+    
+    writer.close()
+    await writer.wait_closed()
+
+asyncio.run(test_device())
+```
+
+## 📝 ENTREGÁVEIS
+
+1. ✅ `tcp_server.py` convertido para asyncio
+2. ✅ `database.py` com connection pooling (e async se OPÇÃO B)
+3. ✅ `message_handler.py` com métodos async
+4. ✅ `main.py` adaptado para asyncio
+5. ✅ `requirements.txt` atualizado
+6. ✅ `test_connection.py` para teste básico
+7. ✅ Comentários explicando mudanças principais
+
+## 🚦 CRITÉRIOS DE ACEITAÇÃO
+
+- [ ] Código roda sem erros
+- [ ] Aceita conexões TCP na porta configurada em .env
+- [ ] Processa mensagens GTFRI corretamente
+- [ ] Salva dados em MongoDB (ambas collections)
+- [ ] Envia ACK de volta para dispositivos
+- [ ] Processa comandos de bloqueio (comandobloqueo)
+- [ ] Mantém conexões abertas permanentemente
+- [ ] Respeita MAX_CONNECTIONS do .env
+- [ ] Responde a comandos em <100ms
+- [ ] Logging funciona corretamente
+
+## 💡 DICAS DE IMPLEMENTAÇÃO
+
+1. **Para tornar sync code async sem refatorar tudo:**
+```python
+import asyncio
+
+# Executar código sync em thread separada
+result = await asyncio.to_thread(sync_function, args)
+```
+
+2. **Para manter compatibilidade com PyMongo (OPÇÃO A):**
+```python
+# Database operations em thread pool
+async def insert_vehicle_data_async(self, data):
+    return await asyncio.to_thread(
+        self.db['vehicle_data'].insert_one,
+        data.to_dict()
+    )
+```
+
+3. **Para processar mensagens sem bloquear:**
+```python
+async def process_message(self, data, client_ip):
+    """Process message asynchronously"""
+    message = data.decode('utf-8')
+    
+    # Handler já deve ser async agora
+    response = await message_handler.handle_incoming_message(
+        message, 
+        client_ip
+    )
+    
+    return response
+```
+
+4. **Error handling em coroutines:**
+```python
+async def handle_client(self, reader, writer):
+    try:
+        while self.running:
+            # ... código ...
+    except asyncio.CancelledError:
+        logger.info("Connection cancelled")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+    finally:
+        writer.close()
+        await writer.wait_closed()
+```
+
+## 🔍 VERIFICAÇÃO FINAL
+
+Antes de considerar completo, verificar:
+1. ✅ Todas as importações estão corretas (asyncio)
+2. ✅ Todos os métodos async têm `async def` e usam `await`
+3. ✅ Não há `time.sleep()` (usar `await asyncio.sleep()`)
+4. ✅ Database operations não bloqueiam event loop
+5. ✅ Error handling está presente em todas as coroutines
+6. ✅ Variáveis do .env são respeitadas
+7. ✅ Logging funciona normalmente
+
+## 📚 REFERÊNCIAS
+
+- Asyncio docs: https://docs.python.org/3/library/asyncio.html
+- Motor (async MongoDB): https://motor.readthedocs.io/ (se OPÇÃO B)
+- GV50 Protocol: Queclink @Track Air Interface Protocol
+
+---
+
+**IMPORTANTE:** 
+- Mantenha a lógica de negócio existente
+- O objetivo é APENAS converter threads para asyncio
+- Todas as funcionalidades devem continuar funcionando
+- Todas as configurações do .env devem ser respeitadas
+- A aplicação deve escalar de acordo com MAX_CONNECTIONS configurado
