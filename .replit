@@ -43,5 +43,4 @@ expertMode = true
 
 [userenv.shared]
 PUSH_NOTIFICATIONS_ENABLED = "true"
-FIREBASE_CREDENTIALS_PATH = "firebase-credentials.json"
 FIREBASE_DEFAULT_TOPIC = "vehicle_alerts"
