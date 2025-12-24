@@ -81,7 +81,7 @@ class DatabaseManager:
         return await asyncio.to_thread(self.insert_vehicle_data, vehicle_data)
     
     def upsert_vehicle(self, vehicle_data: Dict[str, Any]) -> bool:
-        """Update or insert vehicle information using MongoEngine (sync version)"""
+        """Update or insert vehicle information using MongoEngine atomic modify (sync version)"""
         try:
             imei = vehicle_data.get('IMEI')
             if not imei:
@@ -89,7 +89,18 @@ class DatabaseManager:
                 return False
             
             filtered_data = {k: v for k, v in vehicle_data.items() 
-                           if k not in ['created_by', 'updated_by', '_id']}
+                           if k not in ['created_by', 'updated_by', '_id', 'id', 'IMEI']}
+            
+            skip_fields = ['customer_id', 'dsplaca']
+            for field in skip_fields:
+                if field in filtered_data and not filtered_data[field]:
+                    filtered_data.pop(field)
+            
+            if 'customer_id' in filtered_data and isinstance(filtered_data['customer_id'], str):
+                try:
+                    filtered_data['customer_id'] = ObjectId(filtered_data['customer_id'])
+                except Exception:
+                    filtered_data.pop('customer_id')
             
             date_fields = ['created_at', 'updated_at', 'ultimoalertabateria', 'tsusermanu']
             for field in date_fields:
@@ -100,16 +111,15 @@ class DatabaseManager:
                     except Exception:
                         filtered_data.pop(field, None)
             
-            existing_vehicle = Vehicle.objects(IMEI=imei).first()
+            filtered_data.pop('created_at', None)
+            filtered_data.pop('updated_at', None)
             
-            if existing_vehicle:
-                for key, value in filtered_data.items():
-                    if hasattr(existing_vehicle, key):
-                        setattr(existing_vehicle, key, value)
-                existing_vehicle.save()
-            else:
-                new_vehicle = Vehicle(**filtered_data)
-                new_vehicle.save()
+            update_ops = {f'set__{k}': v for k, v in filtered_data.items()}
+            update_ops['set__updated_at'] = datetime.now()
+            update_ops['set_on_insert__IMEI'] = imei
+            update_ops['set_on_insert__created_at'] = datetime.now()
+            
+            Vehicle.objects(IMEI=imei).modify(upsert=True, new=True, **update_ops)
             
             return True
         except Exception as e:

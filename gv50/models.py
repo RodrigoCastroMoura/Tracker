@@ -52,6 +52,7 @@ class Customer(BaseDocument):
 
     meta = {
         'collection': 'customers',
+        'auto_create_index': False,
         'indexes': [
             {'fields': ['email'], 'unique': True, 'name': 'idx_customer_email_unique', 'sparse': True},
             {'fields': ['document'], 'unique': True, 'name': 'idx_customer_document_unique', 'sparse': True},
@@ -93,8 +94,8 @@ class Vehicle(BaseDocument):
 
     meta = {
         'collection': 'vehicles',
+        'auto_create_index': False,
         'indexes': [
-            # Use explicit names to avoid conflicts
             {'fields': ['IMEI'], 'unique': True, 'name': 'idx_vehicle_imei_unique'},
             {'fields': ['dsplaca'], 'unique': True, 'name': 'idx_vehicle_placa_unique', 'sparse': True},
         ]
