@@ -1,4 +1,5 @@
 import asyncio
+import platform
 from pymongo import MongoClient, ASCENDING
 from pymongo.errors import ConnectionFailure, OperationFailure
 from mongoengine import connect, disconnect
@@ -9,9 +10,12 @@ from config import Config
 from logger import logger
 from models import VehicleData, Vehicle, Customer
 
+# Detect OS for compatibility settings
+IS_WINDOWS = platform.system() == 'Windows'
+
 
 class DatabaseManager:
-    """Database manager for MongoDB operations with connection pooling"""
+    """Database manager for MongoDB operations with connection pooling (Windows/Linux compatible)"""
     
     def __init__(self):
         self.client: Optional[MongoClient] = None
@@ -20,21 +24,47 @@ class DatabaseManager:
         self.setup_collections()
     
     def connect(self):
-        """Connect to MongoDB with connection pooling"""
+        """Connect to MongoDB with connection pooling (Windows/Linux compatible)"""
         try:
+            # Close any existing connections first (important for Windows)
+            try:
+                disconnect()
+            except:
+                pass
+            
+            # Configure connection based on OS
+            connection_kwargs = {
+                'maxPoolSize': 200,
+                'minPoolSize': 50,
+                'maxIdleTimeMS': 30000,
+                'serverSelectionTimeoutMS': 5000,
+            }
+            
+            # Windows needs lazy connection to avoid threading issues
+            if IS_WINDOWS:
+                connection_kwargs['connect'] = False
+            
             self.client = MongoClient(
                 Config.MONGODB_URI,
-                maxPoolSize=200,
-                minPoolSize=50,
-                maxIdleTimeMS=30000,
-                serverSelectionTimeoutMS=5000
+                **connection_kwargs
             )
             self.db = self.client[Config.DATABASE_NAME]
             self.client.admin.command('ping')
             
-            connect(host=Config.MONGODB_URI, db=Config.DATABASE_NAME)
+            # Connect MongoEngine with OS-specific settings
+            mongoengine_kwargs = {
+                'host': Config.MONGODB_URI,
+                'db': Config.DATABASE_NAME,
+                'maxPoolSize': 200,
+                'minPoolSize': 50,
+            }
             
-            logger.info(f"Connected to MongoDB database: {Config.DATABASE_NAME} (with connection pooling)")
+            if IS_WINDOWS:
+                mongoengine_kwargs['connect'] = False
+            
+            connect(**mongoengine_kwargs)
+            
+            logger.info(f"Connected to MongoDB database: {Config.DATABASE_NAME} ({platform.system()})")
         except ConnectionFailure as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
             raise

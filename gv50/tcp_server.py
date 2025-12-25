@@ -1,457 +1,442 @@
+#!/usr/bin/env python3
+"""
+TCP Server for GV50 devices with long-lived connection support
+Handles persistent TCP connections with proper keepalive and timeout management
+Compatible with Windows (development) and Linux (production)
+"""
+
 import asyncio
-import time
-from typing import Dict, List, Optional, Tuple
+import socket
+import platform
+from typing import Dict, Optional
+from datetime import datetime, timedelta
 from config import Config
 from logger import logger
-from protocol_parser import protocol_parser
-from database import db_manager
+
+# Detect operating system
+IS_WINDOWS = platform.system() == 'Windows'
+IS_LINUX = platform.system() == 'Linux'
 
 
-class AsyncGV50Server:
-    """Asyncio TCP server for GV50 GPS tracker - replaces threaded version"""
+class GV50TCPServer:
+    """Asyncio TCP server with long-lived connection support"""
     
     def __init__(self):
         self.server: Optional[asyncio.Server] = None
         self.running = False
-        self.connected_clients: Dict[str, Tuple[asyncio.StreamReader, asyncio.StreamWriter]] = {}
-        self.connected_devices: Dict[str, str] = {}
-        self.commands_sent: Dict[str, float] = {}
-        self.max_connections = Config.MAX_CONNECTIONS
-        self.active_connections = 0
-        self._server_task: Optional[asyncio.Task] = None
+        self.connections: Dict[str, 'ClientConnection'] = {}
+        self.message_handler = None
+        self._cleanup_task = None
     
     async def start_server(self):
-        """Start asyncio TCP server"""
-        if not Config.SERVER_ENABLED:
-            logger.info("Server is disabled in configuration")
-            return
-        
+        """Start TCP server with automatic recovery from accept errors"""
         try:
-            self.server = await asyncio.start_server(
-                self.handle_client,
-                Config.SERVER_IP,
-                Config.SERVER_PORT,
-                backlog=self.max_connections
-            )
+            from message_handler import MessageHandler
+            self.message_handler = MessageHandler()
             
             self.running = True
-            logger.info(f"Asyncio GV50 TCP Server started on {Config.SERVER_IP}:{Config.SERVER_PORT}")
-            print(f"Start server {time.strftime('%Y-%m-%d %H:%M:%S')}")
             
-            async with self.server:
-                await self.server.serve_forever()
-                
-        except Exception as e:
-            logger.error(f"Failed to start TCP server: {e}")
-            print(f"Houve um erro ao iniciar as {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """Handle each client connection asynchronously"""
-        addr = writer.get_extra_info('peername')
-        client_ip = addr[0] if addr else "unknown"
-        client_port = addr[1] if addr else 0
-        connection_id = f"{client_ip}:{client_port}"
-        
-        if not Config.is_ip_allowed(client_ip):
-            logger.warning(f"Connection rejected from blocked IP: {client_ip}")
-            writer.close()
-            await writer.wait_closed()
-            return
-        
-        if self.active_connections >= self.max_connections:
-            logger.warning(f"Max connections ({self.max_connections}) reached, rejecting {connection_id}")
-            writer.close()
-            await writer.wait_closed()
-            return
-        
-        self.active_connections += 1
-        self.connected_clients[connection_id] = (reader, writer)
-        logger.info(f"New connection from {connection_id}")
-        
-        try:
+            # Set custom exception handler for asyncio loop (suppress WinError 64)
+            loop = asyncio.get_event_loop()
+            loop.set_exception_handler(self._asyncio_exception_handler)
+            
+            # Start connection cleanup task
+            self._cleanup_task = asyncio.create_task(self._connection_cleanup_loop())
+            
+            logger.info(f"TCP Server starting on {Config.SERVER_IP}:{Config.SERVER_PORT}")
+            
+            # Keep server running with automatic restart on errors
             while self.running:
                 try:
-                    data = await asyncio.wait_for(
-                        reader.read(999999),
-                        timeout=Config.CONNECTION_TIMEOUT
-                    )
-                    
-                    if not data:
-                        logger.info(f"Client {connection_id} disconnected (long-connection ended)")
-                        break
-                    
-                    response = await self.read_callback(writer, data, client_ip)
-                    
-                    if response:
-                        await self.send_data(writer, response)
-                    
-                    await self.send_heartbeat_if_needed(writer, client_ip)
-                    
-                except asyncio.TimeoutError:
-                    logger.debug(f"Timeout on {connection_id}, sending heartbeat")
-                    await self.send_heartbeat_if_needed(writer, client_ip)
-                    continue
-                except ConnectionResetError:
-                    logger.warning(f"Connection reset for {connection_id}")
-                    break
+                    await self._run_server()
                 except Exception as e:
-                    logger.error(f"Error receiving data from {connection_id}: {e}")
-                    break
-                    
-        except Exception as e:
-            logger.error(f"Error in handle_client for {connection_id}: {e}")
-        finally:
-            await self.cleanup_connection(writer, connection_id)
-    
-    async def read_callback(self, writer: asyncio.StreamWriter, data: bytes, client_ip: str) -> Optional[str]:
-        """Process received data - TCP long-connection as recommended by manufacturer"""
-        try:
-            if len(data) < 1:
-                return None
-            
-            try:
-                message = data.decode('utf-8')
-            except UnicodeDecodeError:
-                message = data.decode('latin-1')
-            
-            addr = writer.get_extra_info('peername')
-            connection_id = f"{client_ip}:{addr[1]}" if addr else client_ip
-            
-            response_parts = message.split(':')
-            
-            if len(response_parts) == 2:
-                command_parts = response_parts[1].split(',')
-                
-                if len(command_parts) > 0:
-                    msg_type = response_parts[0].strip()
-                    
-                    if msg_type == "+RESP":
-                        await self.process_resp_message(command_parts, writer, client_ip)
-                    elif msg_type == "+BUFF":
-                        await self.process_buff_message(command_parts, writer, client_ip)
-                    elif msg_type == "+ACK":
-                        await self.process_ack_message(command_parts, writer, client_ip)
-                    
-                    logger.info(f"Keeping connection alive for {connection_id} (long-connection mode)")
-            
-            return None
+                    if self.running:
+                        logger.error(f"Server error: {e}, restarting in 2 seconds...")
+                        await asyncio.sleep(2)
+                    else:
+                        break
                         
         except Exception as e:
-            logger.error(f"Error in read_callback: {e}")
-            return None
+            logger.error(f"Fatal error starting TCP server: {e}")
+            self.running = False
+            raise
     
-    async def process_resp_message(self, command_parts: List[str], writer: asyncio.StreamWriter, client_ip: str):
-        """Process +RESP messages"""
-        try:
-            if len(command_parts) > 0:
-                command_type = command_parts[0]
-                
-                if command_type == "GTFRI":
-                    if len(command_parts) > 13:
-                        imei = command_parts[2]
-                        
-                        first_connection = imei not in self.connected_devices
-                        if first_connection:
-                            self.connected_devices[imei] = client_ip
-                        
-                        await self.execute_immediate_commands(writer, imei)
-                        
-                        raw_message = '+RESP:' + ','.join(command_parts)
-                        parsed_data = protocol_parser.parse_message(raw_message)
-                        
-                        if parsed_data and not parsed_data.get('error'):
-                            vehicle_data = {
-                                'imei': parsed_data.get('imei', imei),
-                                'speed': parsed_data.get('speed', '0'),
-                                'altitude': parsed_data.get('altitude', '0'),
-                                'longitude': parsed_data.get('longitude', '0'),
-                                'latitude': parsed_data.get('latitude', '0'),
-                                'device_timestamp': parsed_data.get('device_timestamp', ''),
-                                'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                                'raw_message': raw_message
-                            }
-                            logger.info(f"Parsed device timestamp: {parsed_data.get('device_timestamp', 'N/A')}")
-                        else:
-                            vehicle_data = {
-                                'imei': imei,
-                                'speed': command_parts[8],
-                                'altitude': command_parts[10],
-                                'longitude': command_parts[11],
-                                'latitude': command_parts[12],
-                                'device_timestamp': command_parts[13],
-                                'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                                'raw_message': raw_message
-                            }
-                        
-                        from message_handler import message_handler
-                        response = await asyncio.to_thread(
-                            message_handler.handle_incoming_message,
-                            raw_message,
-                            client_ip
-                        )
-                        
-                        if response:
-                            await self.send_data(writer, response)
-                        
-                        await self.send_command(writer, vehicle_data['imei'])
-                        
-                elif command_type in ["GTIGN", "GTIGF"]:
-                    if len(command_parts) > 11:
-                        imei = command_parts[2]
-                        
-                        first_connection = imei not in self.connected_devices
-                        if first_connection:
-                            self.connected_devices[imei] = client_ip
-                        
-                        await self.execute_immediate_commands(writer, imei)
-                        
-                        vehicle_data = {
-                            'imei': imei,
-                            'speed': command_parts[6],
-                            'altitude': command_parts[8],
-                            'longitude': command_parts[9],
-                            'latitude': command_parts[10],
-                            'device_timestamp': command_parts[19] if len(command_parts) > 19 else '',
-                            'server_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                            'ignition': command_type == "GTIGN",
-                            'raw_message': '+RESP:' + ','.join(command_parts)
-                        }
-                        
-                        from message_handler import message_handler
-                        await asyncio.to_thread(
-                            message_handler.save_vehicle_data,
-                            vehicle_data
-                        )
-                        
-                        await asyncio.to_thread(
-                            message_handler.update_vehicle_ignition,
-                            vehicle_data['imei'],
-                            vehicle_data['ignition']
-                        )
-                        
-                        await self.send_command(writer, vehicle_data['imei'])
-                        
-        except Exception as e:
-            logger.error(f"Error processing RESP message: {e}")
+    async def _run_server(self):
+        """Run server instance with proper error handling"""
+        # Configure server - Windows doesn't support reuse_port
+        import platform
+        server_kwargs = {
+            'reuse_address': True,
+            'backlog': Config.MAX_CONNECTIONS
+        }
+        
+        # Only add reuse_port on Linux
+        if platform.system() == 'Linux':
+            server_kwargs['reuse_port'] = True
+        
+        self.server = await asyncio.start_server(
+            self.handle_client,
+            Config.SERVER_IP,
+            Config.SERVER_PORT,
+            **server_kwargs
+        )
+        
+        logger.info(f"TCP Server ready on {Config.SERVER_IP}:{Config.SERVER_PORT}")
+        
+        async with self.server:
+            await self.server.serve_forever()
     
-    async def process_buff_message(self, command_parts: List[str], writer: asyncio.StreamWriter, client_ip: str):
-        """Process +BUFF messages"""
-        try:
-            if len(command_parts) > 0 and command_parts[0] == "GTFRI":
-                if len(command_parts) > 13:
-                    device_timestamp = command_parts[13]
-                    if device_timestamp:
-                        try:
-                            year = device_timestamp[0:4]
-                            month = device_timestamp[4:6] 
-                            day = device_timestamp[6:8]
-                            hour = device_timestamp[8:10]
-                            minute = device_timestamp[10:12]
-                            
-                            device_time = f"{year}-{month}-{day} {hour}:{minute}"
-                            current_time = time.strftime('%Y-%m-%d %H:%M')
-                            
-                            if device_time < current_time:
-                                vehicle_data = {
-                                    'imei': command_parts[2],
-                                    'speed': command_parts[8],
-                                    'altitude': command_parts[10],
-                                    'longitude': command_parts[11],
-                                    'latitude': command_parts[12],
-                                    'device_timestamp': command_parts[13],
-                                    'server_timestamp': device_time,
-                                    'raw_message': '+BUFF:' + ','.join(command_parts)
-                                }
-                                
-                                await self.execute_immediate_commands(writer, vehicle_data['imei'])
-                                
-                                from message_handler import message_handler
-                                await asyncio.to_thread(
-                                    message_handler.save_vehicle_data,
-                                    vehicle_data
-                                )
-                                await self.send_command(writer, vehicle_data['imei'])
-                        except Exception:
-                            pass
-                            
-        except Exception as e:
-            logger.error(f"Error processing BUFF message: {e}")
-    
-    async def process_ack_message(self, command_parts: List[str], writer: asyncio.StreamWriter, client_ip: str):
-        """Process +ACK messages - filter GTHBD heartbeats"""
-        try:
-            if len(command_parts) > 0:
-                command_type = command_parts[0]
-                
-                if command_type == "GTHBD":
-                    if len(command_parts) > 2:
-                        imei = command_parts[2]
-                        logger.debug(f"Heartbeat received from IMEI {imei} at {client_ip}")
-                        
-                        if imei in self.connected_devices:
-                            logger.debug(f"Heartbeat from known device {imei}")
-                        else:
-                            self.connected_devices[imei] = client_ip
-                            logger.info(f"New device connected: IMEI {imei} from {client_ip}")
-                        
-                        logger.info(f"Checking pending commands for {imei} (heartbeat)")
-                        await self.execute_immediate_commands(writer, imei)
-                    return
-                
-                elif command_type == "GTOUT":
-                    if len(command_parts) >= 3:
-                        imei = command_parts[2]
-                        status = command_parts[3] if len(command_parts) > 3 else "0000"
-                        status = status.replace('$', '').strip()
-                        
-                        if status == "0000" or status == "":
-                            vehicle = await asyncio.to_thread(db_manager.get_vehicle_by_imei, imei)
-                            if vehicle:
-                                if vehicle.get('comandobloqueo') == True:
-                                    blocked = True
-                                elif vehicle.get('comandobloqueo') == False:
-                                    blocked = False
-                                else:
-                                    blocked = vehicle.get('bloqueado', False)
-                                
-                                from message_handler import message_handler
-                                await asyncio.to_thread(
-                                    message_handler.update_vehicle_blocking,
-                                    imei,
-                                    blocked
-                                )
-                                
-                                keys_to_remove = [key for key in self.commands_sent.keys() if key.startswith(f"{imei}_")]
-                                for key in keys_to_remove:
-                                    del self.commands_sent[key]
-                                logger.info(f"Cache cleared for {imei}")
-                                
-                                logger.info(f"Updated blocking status for {imei}: {'blocked' if blocked else 'unblocked'}")
-                        else:
-                            logger.info(f"Processing command ACK for {imei} with status: {status}")
-                            vehicle = await asyncio.to_thread(db_manager.get_vehicle_by_imei, imei)
-                            
-                            if vehicle and vehicle.get('comandobloqueo') is not None:
-                                if vehicle.get('comandobloqueo') == True:
-                                    blocked = True
-                                    logger.info(f"Blocking command confirmed for {imei} - Vehicle BLOCKED")
-                                else:
-                                    blocked = False
-                                    logger.info(f"Unblocking command confirmed for {imei} - Vehicle UNBLOCKED")
-                                
-                                from message_handler import message_handler
-                                await asyncio.to_thread(
-                                    message_handler.update_vehicle_blocking,
-                                    imei,
-                                    blocked
-                                )
-                                
-                                keys_to_remove = [key for key in self.commands_sent.keys() if key.startswith(f"{imei}_")]
-                                for key in keys_to_remove:
-                                    del self.commands_sent[key]
-                                logger.info(f"Cache cleared for {imei}")
-                                
-                                logger.info(f"Updated blocking status for {imei}: {'BLOCKED' if blocked else 'UNBLOCKED'}")
-                            else:
-                                logger.warning(f"No pending command found for {imei} when processing ACK")
-                    
-        except Exception as e:
-            logger.error(f"Error processing ACK message: {e}")
-    
-    async def send_command(self, writer: asyncio.StreamWriter, imei: str):
-        """Send command to device if needed"""
-        try:
-            from message_handler import message_handler
-            pending_command = message_handler.get_pending_command(imei)
-            if pending_command:
-                logger.warning(f"Sending command via TCP to {imei}: {pending_command}")
-                await self.send_data(writer, pending_command)
-        except Exception as e:
-            logger.error(f"Error sending command: {e}")
-    
-    async def execute_immediate_commands(self, writer: asyncio.StreamWriter, imei: str):
-        """Execute pending commands immediately"""
-        try:
-            vehicle = await asyncio.to_thread(db_manager.get_vehicle_by_imei, imei)
-            
-            if vehicle is None:
+    def _asyncio_exception_handler(self, loop, context):
+        """Custom exception handler for asyncio to suppress common Windows errors and keep server running"""
+        exception = context.get('exception')
+        message = context.get('message', '')
+        
+        # Suppress common Windows disconnection errors that are normal
+        if isinstance(exception, OSError):
+            if hasattr(exception, 'winerror') and exception.winerror in [64, 10054]:
+                # WinError 64: Network name no longer available
+                # WinError 10054: Connection reset by peer
+                # These are normal when devices disconnect - suppress completely
                 return
-            
-            comando_pendente = vehicle.get('comandobloqueo')
-            if comando_pendente is not None:
-                command_key = f"{imei}_out"
-                
-                if command_key in self.commands_sent:
-                    elapsed = time.time() - self.commands_sent[command_key]
-                    if elapsed < 60:
-                        logger.debug(f"Command already sent for {imei}, waiting for ACK ({elapsed:.0f}s ago)")
-                        return
-                
-                if comando_pendente == True:
-                    bit = "1"
-                else:
-                    bit = "0"
-                
-                comando = f"AT+GTOUT=gv50,{bit},,,,,,0,,,,,,,000{bit}$"
-                
-                logger.warning(f"Executing IMMEDIATE command for {imei}: {comando}")
-                await self.send_data(writer, comando)
-                
-                self.commands_sent[command_key] = time.time()
-                
-        except Exception as e:
-            logger.error(f"Error executing immediate commands for {imei}: {e}")
+        
+        # Suppress "Accept failed on a socket" messages for WinError 64
+        if 'Accept failed on a socket' in message:
+            if exception and isinstance(exception, OSError):
+                if hasattr(exception, 'winerror') and exception.winerror == 64:
+                    # This is a normal Windows disconnect - suppress
+                    return
+        
+        # Suppress "Task exception was never retrieved" for these errors
+        if exception and isinstance(exception, OSError):
+            if hasattr(exception, 'winerror') and exception.winerror in [64, 10054]:
+                return
+        
+        # For other exceptions, log them but don't use default handler (which is noisy)
+        if exception:
+            logger.debug(f"Asyncio exception: {exception}")
+        else:
+            logger.debug(f"Asyncio event: {message}")
     
-    async def send_data(self, writer: asyncio.StreamWriter, data: str):
-        """Send data to client"""
-        try:
-            writer.write(data.encode('utf-8'))
-            await writer.drain()
-            logger.debug(f"Sent: {data}")
-        except Exception as e:
-            logger.error(f"Error sending data: {e}")
-    
-    async def send_heartbeat_if_needed(self, writer: asyncio.StreamWriter, client_ip: str):
-        """Send heartbeat if connection is idle"""
-        pass
-    
-    async def cleanup_connection(self, writer: asyncio.StreamWriter, connection_id: str):
-        """Clean up connection resources"""
-        try:
-            if connection_id in self.connected_clients:
-                del self.connected_clients[connection_id]
-            
-            for imei, ip in list(self.connected_devices.items()):
-                if connection_id.startswith(ip):
-                    del self.connected_devices[imei]
-                    logger.info(f"Device {imei} disconnected")
-                    break
-            
-            self.active_connections -= 1
-            
+    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        """Handle client connection with long-lived support and robust error handling"""
+        client_addr = writer.get_extra_info('peername')
+        client_ip = client_addr[0] if client_addr else 'unknown'
+        
+        # Check IP whitelist
+        if not Config.is_ip_allowed(client_ip):
+            logger.warning(f"Connection rejected from unauthorized IP: {client_ip}")
             try:
                 writer.close()
                 await writer.wait_closed()
-            except Exception:
+            except:
                 pass
+            return
+        
+        connection = ClientConnection(reader, writer, client_ip, self.message_handler)
+        
+        try:
+            # Configure socket for long-lived connections
+            self._configure_socket_keepalive(writer)
             
-            logger.info(f"Connection {connection_id} cleaned up")
+            logger.info(f"New connection from {client_ip}")
+            
+            # Process messages from this client
+            await connection.process_messages()
+            
+        except asyncio.CancelledError:
+            logger.debug(f"Connection cancelled for {client_ip}")
+        except ConnectionResetError:
+            logger.debug(f"Connection reset by {client_ip}")
+        except ConnectionAbortedError:
+            logger.debug(f"Connection aborted by {client_ip}")
+        except OSError as e:
+            # Handle Windows-specific errors gracefully
+            if hasattr(e, 'winerror') and e.winerror in [10054, 64]:
+                logger.debug(f"Network disconnect for {client_ip}")
+            else:
+                logger.error(f"OS error handling client {client_ip}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error handling client {client_ip}: {e}")
+        finally:
+            await connection.close()
+            if connection.imei and connection.imei in self.connections:
+                del self.connections[connection.imei]
+            logger.debug(f"Connection cleanup completed for {client_ip}")
+    
+    def _configure_socket_keepalive(self, writer: asyncio.StreamWriter):
+        """Configure TCP keepalive to maintain long-lived connections (Windows/Linux compatible)"""
+        try:
+            # Get the actual socket object
+            transport = writer.transport
+            sock = None
+            
+            # Try different methods to get the real socket
+            if hasattr(transport, '_sock'):
+                sock = transport._sock
+            elif hasattr(transport, 'get_extra_info'):
+                sock = transport.get_extra_info('socket')
+            
+            if not sock:
+                logger.warning("Could not get socket for keepalive configuration")
+                return
+            
+            # Enable TCP keepalive (works on both Windows and Linux)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            
+            # Platform-specific keepalive configuration
+            if IS_LINUX:
+                # Linux: Fine-grained control
+                if hasattr(socket, 'TCP_KEEPIDLE'):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
+                if hasattr(socket, 'TCP_KEEPINTVL'):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+                if hasattr(socket, 'TCP_KEEPCNT'):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 6)
+                logger.debug(f"Linux TCP keepalive configured: 60s idle, 10s interval, 6 probes")
+            elif IS_WINDOWS:
+                # Windows: Try to set keepalive via ioctl if available
+                try:
+                    if hasattr(sock, 'ioctl') and hasattr(socket, 'SIO_KEEPALIVE_VALS'):
+                        # (on/off, keepalive time ms, keepalive interval ms)
+                        sock.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 60000, 10000))
+                        logger.debug("Windows TCP keepalive configured via ioctl: 60s idle, 10s interval")
+                    else:
+                        # Fallback: just enable keepalive without advanced config
+                        logger.debug("Windows TCP keepalive enabled (basic mode)")
+                except (AttributeError, OSError) as e:
+                    # Python 3.13+ may not support ioctl on TransportSocket
+                    logger.debug(f"Windows keepalive advanced config not available: {e}")
+            
+            # Disable Nagle's algorithm for low latency (works on both)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            
+            # Set socket buffer sizes (works on both)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)
             
         except Exception as e:
-            logger.error(f"Error cleaning up connection {connection_id}: {e}")
+            logger.error(f"Error configuring socket: {e}")
+    
+    async def _connection_cleanup_loop(self):
+        """Periodically clean up stale connections and check server health"""
+        last_connection_count = 0
+        no_activity_count = 0
+        
+        while self.running:
+            try:
+                await asyncio.sleep(60)  # Check every minute
+                
+                now = datetime.now()
+                stale_connections = []
+                
+                for imei, conn in self.connections.items():
+                    if now - conn.last_activity > timedelta(seconds=Config.CONNECTION_TIMEOUT):
+                        stale_connections.append(imei)
+                
+                for imei in stale_connections:
+                    logger.warning(f"Closing stale connection for IMEI: {imei}")
+                    conn = self.connections.pop(imei, None)
+                    if conn:
+                        await conn.close()
+                
+                # Health check: detect if server is frozen
+                current_count = len(self.connections)
+                
+                # If we had connections but now have none for too long, server might be frozen
+                if last_connection_count > 0 and current_count == 0:
+                    no_activity_count += 1
+                else:
+                    no_activity_count = 0
+                
+                last_connection_count = current_count
+                
+                # If no activity for 5 minutes and server should be running, log warning
+                if no_activity_count > 5 and self.running:
+                    logger.warning(f"No connections for {no_activity_count} minutes - server may need restart")
+                        
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in connection cleanup: {e}")
     
     def get_connection_count(self) -> int:
-        """Get current connection count"""
-        return self.active_connections
+        """Get active connection count"""
+        return len(self.connections)
+    
+    def is_server_running(self) -> bool:
+        """Check if server is running and accepting connections"""
+        return self.running and self.server is not None
     
     def stop_server(self):
-        """Stop the server"""
+        """Stop TCP server"""
         self.running = False
+        
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
         
         if self.server:
             self.server.close()
-        
-        logger.info("GV50 TCP Server stopped")
+            logger.info("TCP Server stopped")
 
 
-tcp_server = AsyncGV50Server()
+class ClientConnection:
+    """Represents a single client connection with long-lived support"""
+    
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, 
+                 client_ip: str, message_handler):
+        self.reader = reader
+        self.writer = writer
+        self.client_ip = client_ip
+        self.message_handler = message_handler
+        self.imei: Optional[str] = None
+        self.last_activity = datetime.now()
+        self.buffer = bytearray()
+        self.max_buffer_size = 65536  # 64KB max buffer
+    
+    async def process_messages(self):
+        """Process incoming messages with proper buffer management and error handling"""
+        while True:
+            try:
+                # Read with timeout to prevent hanging
+                data = await asyncio.wait_for(
+                    self.reader.read(4096),
+                    timeout=Config.CONNECTION_TIMEOUT
+                )
+                
+                if not data:
+                    # Connection closed by client gracefully
+                    logger.debug(f"Connection closed gracefully by {self.client_ip}")
+                    break
+                
+                self.last_activity = datetime.now()
+                
+                # Add to buffer
+                self.buffer.extend(data)
+                
+                # Prevent buffer overflow
+                if len(self.buffer) > self.max_buffer_size:
+                    logger.warning(f"Buffer overflow for {self.client_ip}, clearing buffer")
+                    self.buffer = bytearray()
+                    continue
+                
+                # Process complete messages
+                await self._process_buffer()
+                
+            except asyncio.TimeoutError:
+                # Timeout is normal for long-lived connections with infrequent messages
+                # Just update activity time and continue
+                self.last_activity = datetime.now()
+                continue
+                
+            except asyncio.CancelledError:
+                logger.debug(f"Connection cancelled for {self.client_ip}")
+                break
+            
+            except ConnectionResetError:
+                # Connection reset by peer (common in Windows)
+                logger.debug(f"Connection reset by peer: {self.client_ip}")
+                break
+            
+            except ConnectionAbortedError:
+                # Connection aborted (common in Windows)
+                logger.debug(f"Connection aborted: {self.client_ip}")
+                break
+            
+            except OSError as e:
+                # Handle Windows-specific network errors
+                if e.winerror in [10054, 64]:  # Connection reset, Network name no longer available
+                    logger.debug(f"Network error for {self.client_ip}: {e}")
+                    break
+                else:
+                    logger.error(f"OS error processing message from {self.client_ip}: {e}")
+                    break
+                
+            except Exception as e:
+                logger.error(f"Unexpected error processing message from {self.client_ip}: {e}")
+                break
+    
+    async def _process_buffer(self):
+        """Process messages in buffer"""
+        try:
+            # Convert buffer to string
+            buffer_str = self.buffer.decode('utf-8', errors='ignore')
+            
+            # GV50 messages end with '$'
+            while '$' in buffer_str:
+                # Find message boundary
+                end_idx = buffer_str.index('$')
+                message = buffer_str[:end_idx + 1].strip()
+                
+                # Remove processed message from buffer
+                bytes_to_remove = len(message.encode('utf-8'))
+                self.buffer = self.buffer[bytes_to_remove:]
+                buffer_str = buffer_str[end_idx + 1:]
+                
+                if message:
+                    # Process the message
+                    await self._handle_message(message)
+            
+        except Exception as e:
+            logger.error(f"Error processing buffer: {e}")
+            # Clear buffer on error to prevent corruption
+            self.buffer = bytearray()
+    
+    async def _handle_message(self, message: str):
+        """Handle a single complete message"""
+        try:
+            # Extract IMEI from message if not already set
+            if not self.imei:
+                self.imei = self._extract_imei(message)
+            
+            # Update last activity
+            self.last_activity = datetime.now()
+            
+            # Process message through handler
+            if self.message_handler:
+                response = await self.message_handler.process_message(message, self.imei, self.client_ip)
+                
+                # Send response if any
+                if response:
+                    await self.send_response(response)
+                    
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+    
+    def _extract_imei(self, message: str) -> Optional[str]:
+        """Extract IMEI from message"""
+        try:
+            # GV50 messages format: +TYPE:MSGID,PROTOCOL,IMEI,...
+            if message.startswith('+'):
+                parts = message.split(',')
+                if len(parts) >= 3:
+                    return parts[2].strip()
+            return None
+        except Exception:
+            return None
+    
+    async def send_response(self, response: str):
+        """Send response to device"""
+        try:
+            if not response.endswith('\r\n'):
+                response += '\r\n'
+            
+            self.writer.write(response.encode('utf-8'))
+            await self.writer.drain()
+            
+            logger.debug(f"Sent response to {self.client_ip}: {response.strip()}")
+            
+        except Exception as e:
+            logger.error(f"Error sending response to {self.client_ip}: {e}")
+    
+    async def close(self):
+        """Close connection gracefully"""
+        try:
+            if self.writer and not self.writer.is_closing():
+                self.writer.close()
+                await self.writer.wait_closed()
+        except Exception as e:
+            logger.error(f"Error closing connection: {e}")
+
+
+# Global server instance
+tcp_server = GV50TCPServer()

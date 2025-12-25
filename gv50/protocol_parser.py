@@ -1,431 +1,334 @@
-import re
-from typing import Dict, Optional, List, Tuple
+#!/usr/bin/env python3
+"""
+Protocol Parser for GV50 GPS Tracker
+Parses incoming messages according to GV50 @Track Air Interface Protocol
+"""
+
+from typing import Optional, Dict, Any
 from datetime import datetime
 from logger import logger
+from datetime_converter import convert_device_timestamp
 
-class QueclinkProtocolParser:
-    """Parser for Queclink @Track protocol messages"""
+
+class ProtocolParser:
+    """Parser for GV50 protocol messages"""
     
-    def __init__(self):
-        # Basic message patterns for Queclink @Track protocol - flexible patterns
-        self.message_patterns = {
-            'GTFRI': r'\+(?P<msg_type>RESP|BUFF|ACK):GTFRI,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>[^$]*)\$',
-            'GTIGN': r'\+(?P<msg_type>RESP|BUFF|ACK):GTIGN,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<report_id>[^,]*),(?P<report_type>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$',
-            'GTIGF': r'\+(?P<msg_type>RESP|BUFF|ACK):GTIGF,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<report_id>[^,]*),(?P<report_type>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$',
-            'GTOUT': r'\+(?P<msg_type>RESP|BUFF|ACK):GTOUT,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<report_id>[^,]*),(?P<report_type>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$',
-            'GTSRI': r'\+(?P<msg_type>RESP|BUFF|ACK):GTSRI,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<status>[^,]*),(?P<reserved1>[^,]*),(?P<reserved2>[^,]*),(?P<reserved3>[^,]*),(?P<reserved4>[^,]*),(?P<reserved5>[^,]*),(?P<reserved6>[^,]*),(?P<timestamp>[^,]*),(?P<count>[^$]*)\$',
-            'GTSTT': r'\+(?P<msg_type>RESP|BUFF|ACK):GTSTT,(?P<protocol_version>[^,]*),(?P<imei>[^,]*),(?P<device_name>[^,]*),(?P<motion_status>[^,]*),(?P<reserved1>[^,]*),(?P<gps_accuracy>[^,]*),(?P<speed>[^,]*),(?P<course>[^,]*),(?P<altitude>[^,]*),(?P<longitude>[^,]*),(?P<latitude>[^,]*),(?P<device_timestamp>[^,]*),(?P<mcc>[^,]*),(?P<mnc>[^,]*),(?P<lac>[^,]*),(?P<cell_id>[^,]*),(?P<reserved2>[^,]*),(?P<odometer>[^,]*),(?P<count>\d+)\$'
-        }
-    
-    def parse_message(self, message: str) -> Dict[str, str]:
-        """Parse Queclink @Track protocol message"""
+    def parse_message(self, message: str) -> Optional[Dict[str, Any]]:
+        """
+        Parse GV50 protocol message
+        
+        Args:
+            message: Raw message string
+            
+        Returns:
+            Parsed message dictionary or None if parsing fails
+        """
         try:
             message = message.strip()
+            
             if not message:
-                return {'error': 'Empty message'}
+                return None
             
-            # Determine message type from the message content
-            message_type = self._detect_message_type(message)
-            if not message_type:
-                return {'error': 'Unknown message type'}
+            # GV50 messages start with '+' and end with '$'
+            if not message.startswith('+') or not message.endswith('$'):
+                logger.warning(f"Invalid message format: {message[:50]}")
+                return None
             
-            # Parse all protocols with field-based approach like C#
-            if message_type == 'GTFRI':
-                return self._parse_gtfri(message)
-            elif message_type == 'GTIGN':
-                return self._parse_gtign(message)
-            elif message_type == 'GTIGF':
-                return self._parse_gtigf(message)
-            elif message_type == 'GTOUT':
-                return self._parse_gtout(message)
-            elif message_type == 'GTSRI':
-                return self._parse_gtsri(message)
-            elif message_type == 'GTSTT':
-                return self._parse_gtstt(message)
+            # Remove delimiters
+            message = message[1:-1]  # Remove '+' and '$'
             
-            # Fallback to regex patterns for unknown types
-            pattern = self.message_patterns.get(message_type)
-            if not pattern:
-                return {'error': f'No pattern for message type: {message_type}'}
+            # Split by comma
+            parts = message.split(',')
             
-            match = re.match(pattern, message)
-            if not match:
-                logger.debug(f"Failed to match pattern for {message_type}: {message}")
-                return {'error': f'Message format invalid for {message_type}'}
+            if len(parts) < 2:
+                logger.warning(f"Insufficient parts in message: {message[:50]}")
+                return None
             
-            # Extract data from the match
-            data = match.groupdict()
-            data['report_type'] = message_type
+            # Extract message type
+            header = parts[0].split(':')
+            if len(header) != 2:
+                logger.warning(f"Invalid header format: {parts[0]}")
+                return None
             
-            # Convert numeric fields
-            self._convert_numeric_fields(data)
+            msg_category = header[0]  # RESP, ACK, etc
+            msg_type = header[1]  # GTFRI, GTHBD, etc
             
-            logger.debug(f"Successfully parsed {message_type} message for IMEI: {data.get('imei', 'unknown')}")
-            return data
-            
+            # Parse based on message type
+            if msg_type == 'GTFRI':
+                return self._parse_gtfri(parts, msg_category)
+            elif msg_type == 'GTHBD':
+                return self._parse_gthbd(parts, msg_category)
+            elif msg_type == 'GTIGN':
+                return self._parse_gtign(parts, msg_category)
+            elif msg_type == 'GTIGF':
+                return self._parse_gtigf(parts, msg_category)
+            elif msg_type == 'GTOUT':
+                return self._parse_gtout(parts, msg_category)
+            elif msg_type == 'GTEPS':
+                return self._parse_gteps(parts, msg_category)
+            elif msg_type == 'GTPNA':
+                return self._parse_gtpna(parts, msg_category)
+            elif msg_type == 'GTPFA':
+                return self._parse_gtpfa(parts, msg_category)
+            elif msg_type == 'GTMPN':
+                return self._parse_gtmpn(parts, msg_category)
+            elif msg_type == 'GTMPF':
+                return self._parse_gtmpf(parts, msg_category)
+            elif msg_type == 'GTBTC':
+                return self._parse_gtbtc(parts, msg_category)
+            elif msg_type == 'GTSTC':
+                return self._parse_gtstc(parts, msg_category)
+            elif msg_type == 'GTSTT':
+                return self._parse_gtstt(parts, msg_category)
+            elif msg_type in ['GTBSI', 'GTSRI', 'GTDOG', 'GTFFC']:
+                # ACK messages
+                return self._parse_ack(parts, msg_category, msg_type)
+            else:
+                logger.warning(f"Unknown message type: {msg_type}")
+                return {'message_type': msg_type, 'raw_parts': parts}
+                
         except Exception as e:
             logger.error(f"Error parsing message: {e}")
-            return {'error': f'Parse error: {str(e)}'}
+            return None
     
-    def _extract_device_timestamp(self, fields: List[str]) -> str:
-        """Extract device timestamp from GTFRI message - it's typically near the end"""
+    def _parse_gtfri(self, parts: list, category: str) -> Dict[str, Any]:
+        """
+        Parse GTFRI - Fixed Report Information
+        Format: +RESP:GTFRI,protocol,imei,device_name,report_id,report_type,
+                number,gps_accuracy,speed,azimuth,altitude,longitude,latitude,
+                send_time,mcc,mnc,lac,cell_id,reserved,mileage,hour_meter,
+                adc1,battery_voltage,input_status,output_status,event_status,
+                send_interval,info_count,info_type,count_number$
+        """
         try:
-            # For GTFRI, device timestamp is usually at the end before counter
-            # Based on your example: 20250727122605 appears near the end
-            # Let's check the last few fields for a 14-digit timestamp
-            for i in range(len(fields) - 1, max(0, len(fields) - 5), -1):
-                field = fields[i].strip()
-                if len(field) == 14 and field.isdigit():
-                    return field
-            return ''
-        except Exception as e:
-            logger.error(f"Error extracting device timestamp: {e}")
-            return ''
-    
-    def _parse_gtfri(self, message: str) -> Dict[str, str]:
-        """Parse GTFRI message based on C# implementation"""
-        try:
-            # Remove prefix and suffix
-            if not message.startswith('+') or not message.endswith('$'):
-                return {'error': 'Invalid message format'}
-            
-            # Split by ':' first to get msg_type and data part
-            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
-            if len(msg_parts) != 2:
-                return {'error': 'Invalid message structure'}
-            
-            msg_type = msg_parts[0]  # RESP, BUFF, ACK
-            data_part = msg_parts[1]
-            
-            # Split data part by comma
-            fields = data_part.split(',')
-            
-            if len(fields) < 14:  # Minimum required fields based on C# code
-                return {'error': f'Insufficient fields in GTFRI: {len(fields)}'}
-            
-            # Map fields according to C# implementation:
-            # C# GTFRI: comando[2]=IMEI, comando[8]=speed, comando[10]=altitude, comando[11]=longitude, comando[12]=latitude, comando[13]=dataDevice
-            data = {
-                'msg_type': msg_type,
-                'report_type': 'GTFRI',
-                'protocol_version': fields[1] if len(fields) > 1 else '',
-                'imei': fields[2] if len(fields) > 2 else '',  # comando[2] no C#
-                'device_name': fields[3] if len(fields) > 3 else '',
-                'reserved1': fields[4] if len(fields) > 4 else '',
-                'gps_accuracy': fields[5] if len(fields) > 5 else '0',
-                'speed': fields[8] if len(fields) > 8 else '0',  # comando[8] no C# para GTFRI
-                'course': fields[7] if len(fields) > 7 else '0',
-                'altitude': fields[9] if len(fields) > 9 else '0',  # altitude
-                'longitude': fields[10] if len(fields) > 10 else '0',  # longitude  
-                'latitude': fields[11] if len(fields) > 11 else '0',  # latitude
-                'gps_timestamp': fields[12] if len(fields) > 12 else '',  # Data/hora GPS
-                'device_timestamp': self._extract_device_timestamp(fields),  # Data/hora do dispositivo (final)
-                'mcc': fields[14] if len(fields) > 14 else '',
-                'mnc': fields[15] if len(fields) > 15 else '',
-                'lac': fields[16] if len(fields) > 16 else '',
-                'cell_id': fields[17] if len(fields) > 17 else '',
-                'reserved2': fields[18] if len(fields) > 18 else '',
-                'odometer': fields[19] if len(fields) > 19 else '0',
-                'count': fields[20] if len(fields) > 20 else '0'
+            result = {
+                'message_type': 'GTFRI',
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
+                'report_id': parts[4] if len(parts) > 4 else None,
+                'gps_accuracy': parts[6] if len(parts) > 6 else None,
+                'speed': parts[7] if len(parts) > 7 else None,
+                'azimuth': parts[8] if len(parts) > 8 else None,
+                'altitude': parts[9] if len(parts) > 9 else None,
+                'longitude': parts[10] if len(parts) > 10 else None,
+                'latitude': parts[11] if len(parts) > 11 else None,
             }
             
-            # Convert numeric fields
-            self._convert_numeric_fields(data)
+            # Parse send time
+            if len(parts) > 12 and parts[12]:
+                result['send_time'] = convert_device_timestamp(parts[12])
             
-            # Add raw message for storage
-            data['raw_message'] = message
+            # Network info
+            result['mcc'] = parts[13] if len(parts) > 13 else None
+            result['mnc'] = parts[14] if len(parts) > 14 else None
+            result['lac'] = parts[15] if len(parts) > 15 else None
+            result['cell_id'] = parts[16] if len(parts) > 16 else None
             
-            logger.debug(f"Successfully parsed GTFRI message for IMEI: {data.get('imei', 'unknown')}")
-            return data
+            # Additional info
+            # result['battery_voltage'] = parts[21] if len(parts) > 21 else None
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error parsing GTFRI: {e}")
-            return {'error': f'GTFRI parse error: {str(e)}'}
+            return {'message_type': 'GTFRI', 'error': str(e)}
     
-    def _parse_gtign(self, message: str) -> Dict[str, str]:
-        """Parse GTIGN message based on C# implementation"""
+    def _parse_gthbd(self, parts: list, category: str) -> Dict[str, Any]:
+        """
+        Parse GTHBD - Heartbeat
+        Format: +ACK:GTHBD,protocol,imei,device_name,count_number,send_time,count$
+        """
         try:
-            # Split by ':' first to get msg_type and data part
-            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
-            if len(msg_parts) != 2:
-                return {'error': 'Invalid message structure'}
-            
-            msg_type = msg_parts[0]
-            data_part = msg_parts[1]
-            fields = data_part.split(',')
-            
-            if len(fields) < 12:
-                return {'error': f'Insufficient fields in GTIGN: {len(fields)}'}
-            
-            # Map fields according to C# implementation:
-            # C# GTIGN: comando[2]=IMEI, comando[6]=speed, comando[8]=altitude, comando[9]=longitude, comando[10]=latitude, comando[11]=dataDevice
-            data = {
-                'msg_type': msg_type,
-                'report_type': 'GTIGN',
-                'protocol_version': fields[1] if len(fields) > 1 else '',
-                'imei': fields[2] if len(fields) > 2 else '',
-                'device_name': fields[3] if len(fields) > 3 else '',
-                'report_id': fields[4] if len(fields) > 4 else '',
-                'report_type_field': fields[5] if len(fields) > 5 else '',
-                'speed': fields[6] if len(fields) > 6 else '0',  # comando[6] no C#
-                'course': fields[7] if len(fields) > 7 else '0',
-                'altitude': fields[8] if len(fields) > 8 else '0',  # comando[8] no C#
-                'longitude': fields[9] if len(fields) > 9 else '0',  # comando[9] no C#
-                'latitude': fields[10] if len(fields) > 10 else '0',  # comando[10] no C#
-                'device_timestamp': fields[11] if len(fields) > 11 else '',  # comando[11] no C#
-                'ignition': True  # GTIGN = ignição ligada
+            return {
+                'message_type': 'GTHBD',
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
+            }
+        except Exception as e:
+            logger.error(f"Error parsing GTHBD: {e}")
+            return {'message_type': 'GTHBD', 'error': str(e)}
+    
+    def _parse_gtign(self, parts: list, category: str) -> Dict[str, Any]:
+        """
+        Parse GTIGN - Ignition On
+        Format: +RESP:GTIGN,protocol,imei,device_name,report_id,report_type,
+                gps_accuracy,speed,azimuth,altitude,longitude,latitude,
+                send_time,mcc,mnc,lac,cell_id,reserved,mileage,input_status,
+                count_number$
+        """
+        try:
+            result = {
+                'message_type': 'GTIGN',
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
+                'gps_accuracy': parts[5] if len(parts) > 5 else None,
+                'speed': parts[6] if len(parts) > 6 else None,
+                'azimuth': parts[7] if len(parts) > 7 else None,
+                'altitude': parts[8] if len(parts) > 8 else None,
+                'longitude': parts[9] if len(parts) > 9 else None,
+                'latitude': parts[10] if len(parts) > 10 else None,
             }
             
-            self._convert_numeric_fields(data)
+            if len(parts) > 11 and parts[11]:
+                result['send_time'] = convert_device_timestamp(parts[11])
             
-            # Add raw message for storage
-            data['raw_message'] = message
-            
-            return data
+            return result
             
         except Exception as e:
             logger.error(f"Error parsing GTIGN: {e}")
-            return {'error': f'GTIGN parse error: {str(e)}'}
+            return {'message_type': 'GTIGN', 'error': str(e)}
     
-    def _parse_gtigf(self, message: str) -> Dict[str, str]:
-        """Parse GTIGF message based on C# implementation"""
-        try:
-            # Split by ':' first to get msg_type and data part
-            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
-            if len(msg_parts) != 2:
-                return {'error': 'Invalid message structure'}
-            
-            msg_type = msg_parts[0]
-            data_part = msg_parts[1]
-            fields = data_part.split(',')
-            
-            if len(fields) < 12:
-                return {'error': f'Insufficient fields in GTIGF: {len(fields)}'}
-            
-            # Map fields according to C# implementation (same as GTIGN)
-            # C# GTIGF: comando[2]=IMEI, comando[6]=speed, comando[8]=altitude, comando[9]=longitude, comando[10]=latitude, comando[11]=dataDevice
-            data = {
-                'msg_type': msg_type,
-                'report_type': 'GTIGF',
-                'protocol_version': fields[1] if len(fields) > 1 else '',
-                'imei': fields[2] if len(fields) > 2 else '',
-                'device_name': fields[3] if len(fields) > 3 else '',
-                'report_id': fields[4] if len(fields) > 4 else '',
-                'report_type_field': fields[5] if len(fields) > 5 else '',
-                'speed': fields[6] if len(fields) > 6 else '0',  # comando[6] no C#
-                'course': fields[7] if len(fields) > 7 else '0',
-                'altitude': fields[8] if len(fields) > 8 else '0',  # comando[8] no C#
-                'longitude': fields[9] if len(fields) > 9 else '0',  # comando[9] no C#
-                'latitude': fields[10] if len(fields) > 10 else '0',  # comando[10] no C#
-                'device_timestamp': fields[11] if len(fields) > 11 else '',  # comando[11] no C#
-                'ignition': False  # GTIGF = ignição desligada
-            }
-            
-            self._convert_numeric_fields(data)
-            
-            # Add raw message for storage
-            data['raw_message'] = message
-            
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error parsing GTIGF: {e}")
-            return {'error': f'GTIGF parse error: {str(e)}'}
+    def _parse_gtigf(self, parts: list, category: str) -> Dict[str, Any]:
+        """
+        Parse GTIGF - Ignition Off
+        Same format as GTIGN
+        """
+        result = self._parse_gtign(parts, category)
+        result['message_type'] = 'GTIGF'
+        return result
     
-    def _parse_gtout(self, message: str) -> Dict[str, str]:
-        """Parse GTOUT message based on C# implementation"""
+    def _parse_gtout(self, parts: list, category: str) -> Dict[str, Any]:
+        """
+        Parse GTOUT - Digital Output Port Status
+        Format: +RESP:GTOUT,protocol,imei,device_name,output_id,output_status,
+                send_time,count_number$
+        """
         try:
-            # Split by ':' first to get msg_type and data part
-            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
-            if len(msg_parts) != 2:
-                return {'error': 'Invalid message structure'}
-            
-            msg_type = msg_parts[0]
-            data_part = msg_parts[1]
-            fields = data_part.split(',')
-            
-            if len(fields) < 5:
-                return {'error': f'Insufficient fields in GTOUT: {len(fields)}'}
-            
-            # Map fields according to C# implementation:
-            # C# GTOUT: comando[2]=IMEI, comando[4]=status (0000=bloqueado, outros=desbloqueado)
-            data = {
-                'msg_type': msg_type,
-                'report_type': 'GTOUT',
-                'protocol_version': fields[1] if len(fields) > 1 else '',
-                'imei': fields[2] if len(fields) > 2 else '',
-                'device_name': fields[3] if len(fields) > 3 else '',
-                'status': fields[4] if len(fields) > 4 else '',  # comando[4] no C#
-                'blocked': fields[4] == '0000' if len(fields) > 4 else False  # 0000 = bloqueado
+            return {
+                'message_type': 'GTOUT',
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
+                'output_id': parts[4] if len(parts) > 4 else None,
+                'output_status': int(parts[5]) if len(parts) > 5 and parts[5] else None,
             }
-            
-            return data
-            
         except Exception as e:
             logger.error(f"Error parsing GTOUT: {e}")
-            return {'error': f'GTOUT parse error: {str(e)}'}
+            return {'message_type': 'GTOUT', 'error': str(e)}
     
-    def _parse_gtstt(self, message: str) -> Dict[str, str]:
-        """Parse GTSTT message - mudanças de estado do dispositivo"""
+    def _parse_gteps(self, parts: list, category: str) -> Dict[str, Any]:
+        """
+        Parse GTEPS - External Power Supply
+        Format: +RESP:GTEPS,protocol,imei,device_name,report_type,gps_accuracy,
+                speed,azimuth,altitude,longitude,latitude,send_time,mcc,mnc,
+                lac,cell_id,reserved,mileage,battery_voltage,count_number$
+        """
         try:
-            # Split by ':' first to get msg_type and data part
-            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
-            if len(msg_parts) != 2:
-                return {'error': 'Invalid message structure'}
-            
-            msg_type = msg_parts[0]
-            data_part = msg_parts[1]
-            fields = data_part.split(',')
-            
-            if len(fields) < 13:
-                return {'error': f'Insufficient fields in GTSTT: {len(fields)}'}
-            
-            # Map fields for GTSTT message
-            # GTSTT: mudança de estado do movimento do dispositivo
-            motion_status = fields[4] if len(fields) > 4 else ''
-            
-            # Interpretar estado do movimento:
-            # 11 = Start Moving  
-            # 12 = Stop Moving
-            # 21 = Start Moving (by Vibration)
-            # 22 = Stop Moving (by Vibration)
-            # 41 = Sensor Rest (sensor em repouso)
-            # 42 = Sensor Motion (sensor em movimento)
-            
-            motion_description = {
-                '11': 'Start Moving',
-                '12': 'Stop Moving', 
-                '21': 'Start Moving (Vibration)',
-                '22': 'Stop Moving (Vibration)',
-                '41': 'Sensor Rest',
-                '42': 'Sensor Motion'
-            }.get(motion_status, f'Unknown Status ({motion_status})')
-            
-            data = {
-                'msg_type': msg_type,
-                'report_type': 'GTSTT',
-                'protocol_version': fields[1] if len(fields) > 1 else '',
-                'imei': fields[2] if len(fields) > 2 else '',
-                'device_name': fields[3] if len(fields) > 3 else '',
-                'motion_status': motion_status,
-                'motion_description': motion_description,
-                'is_moving': motion_status in ['11', '21', '42'],  # Estados de movimento
-                'speed': fields[7] if len(fields) > 7 else '0',
-                'course': fields[8] if len(fields) > 8 else '0', 
-                'altitude': fields[9] if len(fields) > 9 else '0',
-                'longitude': fields[10] if len(fields) > 10 else '0',
-                'latitude': fields[11] if len(fields) > 11 else '0',
-                'device_timestamp': fields[12] if len(fields) > 12 else '',
-                'count': fields[-1] if len(fields) > 19 else '0'
+            result = {
+                'message_type': 'GTEPS',
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
+                'gps_accuracy': parts[5] if len(parts) > 5 else None,
+                'speed': parts[6] if len(parts) > 6 else None,
+                'azimuth': parts[7] if len(parts) > 7 else None,
+                'altitude': parts[8] if len(parts) > 8 else None,
+                'longitude': parts[9] if len(parts) > 9 else None,
+                'latitude': parts[10] if len(parts) > 10 else None,
+                'battery_voltage': parts[17] if len(parts) > 17 else None,
             }
             
-            self._convert_numeric_fields(data)
-            logger.info(f"GTSTT parsed for IMEI {data['imei']}: {motion_description}")
-            return data
+            if len(parts) > 11 and parts[11]:
+                result['send_time'] = convert_device_timestamp(parts[11])
             
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error parsing GTEPS: {e}")
+            return {'message_type': 'GTEPS', 'error': str(e)}
+    
+    def _parse_gtpna(self, parts: list, category: str) -> Dict[str, Any]:
+        """Parse GTPNA - Power On"""
+        return self._parse_generic_location(parts, category, 'GTPNA')
+    
+    def _parse_gtpfa(self, parts: list, category: str) -> Dict[str, Any]:
+        """Parse GTPFA - Power Off"""
+        return self._parse_generic_location(parts, category, 'GTPFA')
+    
+    def _parse_gtmpn(self, parts: list, category: str) -> Dict[str, Any]:
+        """Parse GTMPN - Motion Start"""
+        return self._parse_generic_location(parts, category, 'GTMPN')
+    
+    def _parse_gtmpf(self, parts: list, category: str) -> Dict[str, Any]:
+        """Parse GTMPF - Motion Stop"""
+        return self._parse_generic_location(parts, category, 'GTMPF')
+    
+    def _parse_gtbtc(self, parts: list, category: str) -> Dict[str, Any]:
+        """Parse GTBTC - Battery Start Charging"""
+        return self._parse_generic_location(parts, category, 'GTBTC')
+    
+    def _parse_gtstc(self, parts: list, category: str) -> Dict[str, Any]:
+        """Parse GTSTC - Battery Stop Charging"""
+        return self._parse_generic_location(parts, category, 'GTSTC')
+    
+    def _parse_gtstt(self, parts: list, category: str) -> Dict[str, Any]:
+        """
+        Parse GTSTT - Motion State Change
+        Format: +RESP:GTSTT,protocol,imei,device_name,state,send_time,count_number$
+        """
+        try:
+            return {
+                'message_type': 'GTSTT',
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
+                'state': parts[4] if len(parts) > 4 else None,
+            }
         except Exception as e:
             logger.error(f"Error parsing GTSTT: {e}")
-            return {'error': f'GTSTT parse error: {str(e)}'}
+            return {'message_type': 'GTSTT', 'error': str(e)}
     
-    def _parse_gtsri(self, message: str) -> Dict[str, str]:
-        """Parse GTSRI message - Server Information Report (IP change confirmation)"""
+    def _parse_generic_location(self, parts: list, category: str, msg_type: str) -> Dict[str, Any]:
+        """
+        Parse generic location-based message
+        Format similar to GTIGN
+        """
         try:
-            # Split by ':' first to get msg_type and data part
-            msg_parts = message[1:-1].split(':', 1)  # Remove + and $
-            if len(msg_parts) != 2:
-                return {'error': 'Invalid message structure'}
-            
-            msg_type = msg_parts[0]
-            data_part = msg_parts[1]
-            fields = data_part.split(',')
-            
-            if len(fields) < 5:
-                return {'error': f'Insufficient fields in GTSRI: {len(fields)}'}
-            
-            # Map fields for GTSRI message - Server Information Report
-            data = {
-                'msg_type': msg_type,
-                'report_type': 'GTSRI',
-                'protocol_version': fields[1] if len(fields) > 1 else '',
-                'imei': fields[2] if len(fields) > 2 else '',
-                'device_name': fields[3] if len(fields) > 3 else '',
-                'status': fields[4] if len(fields) > 4 else '',  # Status da troca de IP
-                'ip_change_success': fields[4] == '0000' if len(fields) > 4 else False  # 0000 = sucesso
+            result = {
+                'message_type': msg_type,
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
             }
             
-            logger.info(f"GTSRI parsed for IMEI {data['imei']}: IP change status {data['status']}")
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error parsing GTSRI: {e}")
-            return {'error': f'GTSRI parse error: {str(e)}'}
-    
-    def _convert_numeric_fields(self, data: Dict[str, str]):
-        """Convert numeric fields to proper format"""
-        # Convert coordinates to proper format
-        if data.get('longitude') and data.get('latitude'):
-            try:
-                data['longitude'] = str(float(data['longitude']))
-                data['latitude'] = str(float(data['latitude']))
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid coordinates: {data.get('longitude')}, {data.get('latitude')}")
-        
-        # Convert other numeric fields
-        for field in ['speed', 'course', 'altitude', 'gps_accuracy']:
-            if data.get(field):
-                try:
-                    data[field] = str(float(data[field]))
-                except (ValueError, TypeError):
-                    data[field] = '0'
-    
-    def _detect_message_type(self, message: str) -> Optional[str]:
-        """Detect message type from the message content"""
-        for msg_type in self.message_patterns.keys():
-            if f':{msg_type},' in message:
-                return msg_type
-        return None
-    
-    def generate_acknowledgment(self, parsed_data: Dict[str, str]) -> Optional[str]:
-        """Generate acknowledgment response for the device"""
-        try:
-            report_type = parsed_data.get('report_type', '')
-            protocol_version = parsed_data.get('protocol_version', 'A10100')
-            imei = parsed_data.get('imei', '')
-            count = parsed_data.get('count', '0123')
-            
-            if not report_type or not imei:
-                return None
-            
-            # Generate timestamp
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            
-            # Generate simple checksum (simplified for this implementation)
-            checksum = "11F0"
-            
-            # Build acknowledgment message
-            ack_message = f"+ACK:{report_type},{protocol_version},{imei},,{count}$,{timestamp},{checksum}$"
-            
-            return ack_message
-            
-        except Exception as e:
-            logger.error(f"Error generating acknowledgment: {e}")
-            return None
-    
-    def parse_coordinates(self, longitude: str, latitude: str) -> Tuple[Optional[float], Optional[float]]:
-        """Parse and validate GPS coordinates"""
-        try:
-            lon = float(longitude) if longitude else None
-            lat = float(latitude) if latitude else None
-            
-            # Basic validation
-            if lon is not None and (lon < -180 or lon > 180):
-                lon = None
-            if lat is not None and (lat < -90 or lat > 90):
-                lat = None
+            # Try to extract location if available
+            if len(parts) > 10:
+                result['longitude'] = parts[9] if len(parts) > 9 else None
+                result['latitude'] = parts[10] if len(parts) > 10 else None
+                result['altitude'] = parts[8] if len(parts) > 8 else None
                 
-            return lon, lat
-        except (ValueError, TypeError):
-            return None, None
-
-# Global protocol parser instance
-protocol_parser = QueclinkProtocolParser()
+                if len(parts) > 11 and parts[11]:
+                    result['send_time'] = convert_device_timestamp(parts[11])
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error parsing {msg_type}: {e}")
+            return {'message_type': msg_type, 'error': str(e)}
+    
+    def _parse_ack(self, parts: list, category: str, msg_type: str) -> Dict[str, Any]:
+        """
+        Parse ACK messages
+        Format: +ACK:GTXXX,protocol,imei,device_name,count_number,send_time,count$
+        """
+        try:
+            return {
+                'message_type': f'ACK_{msg_type}',
+                'category': category,
+                'protocol': parts[1] if len(parts) > 1 else None,
+                'imei': parts[2] if len(parts) > 2 else None,
+                'device_name': parts[3] if len(parts) > 3 else None,
+            }
+        except Exception as e:
+            logger.error(f"Error parsing ACK: {e}")
+            return {'message_type': f'ACK_{msg_type}', 'error': str(e)}
