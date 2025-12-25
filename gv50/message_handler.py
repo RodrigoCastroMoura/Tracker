@@ -12,7 +12,6 @@ from logger import logger
 from database import db_manager
 from models import VehicleData
 from notification_service import notification_service
-from datetime_converter import convert_device_timestamp
 
 
 class MessageHandler:
@@ -50,7 +49,24 @@ class MessageHandler:
             message_type = parsed.get('message_type')
             parsed_imei = parsed.get('imei', imei)
             
-            logger.debug(f"Processing {message_type} from IMEI {parsed_imei}")
+            # Log message with appropriate emoji
+            emoji_map = {
+                'GTFRI': '📍',  # Fixed report (location)
+                'GTHBD': '❤️',  # Heartbeat
+                'GTIGN': '🔥',  # Ignition ON
+                'GTIGF': '❄️',  # Ignition OFF
+                'GTOUT': '🔒',  # Output control
+                'GTEPS': '🔋',  # External power
+                'GTPNA': '⚡',  # Power ON
+                'GTPFA': '🔌',  # Power OFF
+                'GTMPN': '🚗',  # Motion start
+                'GTMPF': '🛑',  # Motion stop
+                'GTBTC': '🔌',  # Battery charging
+                'GTSTC': '🔋',  # Battery stop charging
+                'GTSTT': '📊',  # Status
+            }
+            emoji = emoji_map.get(message_type, '📨')
+            logger.info(f"{emoji} {message_type} from IMEI {parsed_imei}")
             
             # Process based on message type
             if message_type == 'GTFRI':
@@ -105,10 +121,7 @@ class MessageHandler:
             is_buff = parsed.get('category') == 'BUFF'
             
             # For BUFF messages, use device timestamp for both fields
-
-            device_timestamp_str = parsed.get('mcc', '')
-            device_datetime_converted = convert_device_timestamp(device_timestamp_str)
-            device_time = device_datetime_converted
+            device_time = parsed.get('send_time')
             if is_buff and device_time:
                 server_time = device_time  # Use device time for historical data
             else:
@@ -165,8 +178,6 @@ class MessageHandler:
             
             await db_manager.upsert_vehicle_async(vehicle_update)
             
-            logger.debug(f"Heartbeat processed for IMEI {imei}")
-            
         except Exception as e:
             logger.error(f"Error handling heartbeat: {e}")
     
@@ -179,6 +190,25 @@ class MessageHandler:
             
             # Check if it's a BUFF message (buffered/historical data)
             is_buff = parsed.get('category') == 'BUFF'
+            
+            # For BUFF messages, use device timestamp for both fields
+            device_time = parsed.get('send_time')
+            if is_buff and device_time:
+                server_time = device_time
+            else:
+                server_time = datetime.now()
+            
+            # Save location data
+            vehicle_data = VehicleData(
+                imei=imei,
+                longitude=parsed.get('longitude'),
+                latitude=parsed.get('latitude'),
+                altitude=parsed.get('altitude'),
+                timestamp=server_time,
+                deviceTimestamp=device_time,
+                mensagem_raw=raw_message
+            )
+            await db_manager.insert_vehicle_data_async(vehicle_data)
             
             # Only update Vehicle table if NOT a BUFF message
             if not is_buff:
@@ -215,6 +245,25 @@ class MessageHandler:
             
             # Check if it's a BUFF message (buffered/historical data)
             is_buff = parsed.get('category') == 'BUFF'
+            
+            # For BUFF messages, use device timestamp for both fields
+            device_time = parsed.get('send_time')
+            if is_buff and device_time:
+                server_time = device_time
+            else:
+                server_time = datetime.now()
+            
+            # Save location data
+            vehicle_data = VehicleData(
+                imei=imei,
+                longitude=parsed.get('longitude'),
+                latitude=parsed.get('latitude'),
+                altitude=parsed.get('altitude'),
+                timestamp=server_time,
+                deviceTimestamp=device_time,
+                mensagem_raw=raw_message
+            )
+            await db_manager.insert_vehicle_data_async(vehicle_data)
             
             # Only update Vehicle table if NOT a BUFF message
             if not is_buff:
@@ -288,7 +337,26 @@ class MessageHandler:
             
             # Check if it's a BUFF message (buffered/historical data)
             is_buff = parsed.get('category') == 'BUFF'
-                
+            
+            # For BUFF messages, use device timestamp for both fields
+            device_time = parsed.get('send_time')
+            if is_buff and device_time:
+                server_time = device_time
+            else:
+                server_time = datetime.now()
+            
+            # Save location data
+            vehicle_data = VehicleData(
+                imei=imei,
+                longitude=parsed.get('longitude'),
+                latitude=parsed.get('latitude'),
+                altitude=parsed.get('altitude'),
+                timestamp=server_time,
+                deviceTimestamp=device_time,
+                mensagem_raw=raw_message
+            )
+            await db_manager.insert_vehicle_data_async(vehicle_data)
+            
             # Only update Vehicle table if NOT a BUFF message
             if not is_buff:
                 vehicle_update = {

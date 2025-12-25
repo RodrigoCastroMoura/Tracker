@@ -133,12 +133,13 @@ class GV50TCPServer:
             return
         
         connection = ClientConnection(reader, writer, client_ip, self.message_handler)
+        connection.server_connections = self.connections  # Pass reference to connections dict
         
         try:
             # Configure socket for long-lived connections
             self._configure_socket_keepalive(writer)
             
-            logger.info(f"New connection from {client_ip}")
+            logger.info(f"🔌 New connection from {client_ip}")
             
             # Process messages from this client
             await connection.process_messages()
@@ -163,6 +164,7 @@ class GV50TCPServer:
             await connection.close()
             if connection.imei and connection.imei in self.connections:
                 del self.connections[connection.imei]
+                logger.info(f"🔌 Device {connection.imei} disconnected from {client_ip}")
             logger.debug(f"Connection cleanup completed for {client_ip}")
     
     def _configure_socket_keepalive(self, writer: asyncio.StreamWriter):
@@ -417,6 +419,11 @@ class ClientConnection:
             # Extract IMEI from message if not already set
             if not self.imei:
                 self.imei = self._extract_imei(message)
+                
+                # Register connection in server's connections dict
+                if self.imei and hasattr(self, 'server_connections'):
+                    self.server_connections[self.imei] = self
+                    logger.info(f"📱 Device identified: IMEI {self.imei} from {self.client_ip}")
             
             # Update last activity
             self.last_activity = datetime.now()
