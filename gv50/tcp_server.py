@@ -265,6 +265,34 @@ class GV50TCPServer:
         """Get active connection count"""
         return len(self.connections)
     
+    def get_connected_devices(self) -> list:
+        """Get list of connected devices with details"""
+        devices = []
+        for imei, conn in self.connections.items():
+            devices.append({
+                'imei': imei,
+                'ip': conn.client_ip,
+                'last_activity': conn.last_activity.isoformat(),
+                'connected_since': conn.last_activity.isoformat()
+            })
+        return devices
+    
+    def is_device_connected(self, imei: str) -> bool:
+        """Check if specific device is connected"""
+        return imei in self.connections
+    
+    def get_device_info(self, imei: str) -> dict:
+        """Get info about specific connected device"""
+        if imei in self.connections:
+            conn = self.connections[imei]
+            return {
+                'imei': imei,
+                'ip': conn.client_ip,
+                'last_activity': conn.last_activity.isoformat(),
+                'connected': True
+            }
+        return {'imei': imei, 'connected': False}
+    
     def is_server_running(self) -> bool:
         """Check if server is running and accepting connections"""
         return self.running and self.server is not None
