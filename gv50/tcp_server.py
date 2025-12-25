@@ -143,6 +143,8 @@ class GV50TCPServer:
             # Process messages from this client
             await connection.process_messages()
             
+        except asyncio.TimeoutError:
+            logger.debug(f"Connection timeout for {client_ip}")
         except asyncio.CancelledError:
             logger.debug(f"Connection cancelled for {client_ip}")
         except ConnectionResetError:
