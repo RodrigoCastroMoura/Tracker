@@ -95,6 +95,10 @@ class MessageHandler:
                 await self._handle_battery_stop_charge(parsed, message)
             elif message_type == 'GTSTT':
                 await self._handle_motion_state(parsed)
+            elif message_type == 'GTPDP':
+                await self._handle_pdp_context(parsed)
+            elif message_type == 'GTCID':
+                await self._handle_cell_id(parsed)
             elif message_type in ['ACK_GTBSI', 'ACK_GTSRI', 'ACK_GTOUT', 
                                   'ACK_GTFRI', 'ACK_GTDOG', 'ACK_GTEPS']:
                 logger.debug(f"Received ACK for {message_type}")
@@ -479,6 +483,46 @@ class MessageHandler:
             
         except Exception as e:
             logger.error(f"Error saving location data: {e}")
+    
+    async def _handle_pdp_context(self, parsed: Dict[str, Any]):
+        """Handle GTPDP - PDP Context Activation/Deactivation"""
+        try:
+            imei = parsed.get('imei')
+            if not imei:
+                return
+            
+            # PDP context messages indicate GPRS connection status
+            # Just update timestamp to show device is active
+            vehicle_update = {
+                'IMEI': imei,
+                'tsusermanu': datetime.now()
+            }
+            
+            await db_manager.upsert_vehicle_async(vehicle_update)
+            logger.debug(f"PDP context message from IMEI {imei}")
+            
+        except Exception as e:
+            logger.error(f"Error handling PDP context: {e}")
+    
+    async def _handle_cell_id(self, parsed: Dict[str, Any]):
+        """Handle GTCID - Cell ID information"""
+        try:
+            imei = parsed.get('imei')
+            if not imei:
+                return
+            
+            # Cell ID messages provide cellular network information
+            # Just update timestamp to show device is active
+            vehicle_update = {
+                'IMEI': imei,
+                'tsusermanu': datetime.now()
+            }
+            
+            await db_manager.upsert_vehicle_async(vehicle_update)
+            logger.debug(f"Cell ID message from IMEI {imei}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Cell ID: {e}")
     
     async def _check_pending_commands(self, imei: str) -> Optional[str]:
         """Check if there are pending commands for this device"""
